@@ -11,6 +11,7 @@ config_version=5
 [application]
 
 config/name="Asteroids"
+run/main_scene="res://scenes/game/Main.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
 

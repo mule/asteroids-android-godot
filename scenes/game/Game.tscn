@@ -1,0 +1,41 @@
+[gd_scene load_steps=7 format=3 uid="uid://bqsky4x01tinn"]
+
+[ext_resource type="Script" path="res://scripts/game.gd" id="1_m6aai"]
+[ext_resource type="PackedScene" path="res://scenes/entities/PlayerShip.tscn" id="2_mgmqj"]
+[ext_resource type="PackedScene" path="res://scenes/entities/Asteroid.tscn" id="3_tct56"]
+[ext_resource type="PackedScene" path="res://scenes/entities/Bullet.tscn" id="4_1nphu"]
+[ext_resource type="PackedScene" path="res://scenes/ui/Hud.tscn" id="5_nl3g0"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_xh3dq"]
+size = Vector2(1152, 648)
+
+[node name="Game" type="Node2D"]
+script = ExtResource("1_m6aai")
+
+[node name="Background" type="ColorRect" parent="."]
+offset_right = 1152.0
+offset_bottom = 648.0
+color = Color(0.0352941, 0.0392157, 0.0588235, 1)
+
+[node name="PlayArea" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 0
+
+[node name="PlayAreaBounds" type="CollisionShape2D" parent="PlayArea"]
+position = Vector2(576, 324)
+shape = SubResource("RectangleShape2D_xh3dq")
+debug_color = Color(0.2, 0.7, 1, 0.15)
+
+[node name="Entities" type="Node2D" parent="."]
+
+[node name="PlayerShip" parent="Entities" instance=ExtResource("2_mgmqj")]
+position = Vector2(576, 324)
+
+[node name="Asteroid" parent="Entities" instance=ExtResource("3_tct56")]
+position = Vector2(820, 260)
+
+[node name="Bullet" parent="Entities" instance=ExtResource("4_1nphu")]
+visible = false
+position = Vector2(660, 324)
+
+[node name="Hud" parent="." instance=ExtResource("5_nl3g0")]
