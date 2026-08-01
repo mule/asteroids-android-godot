@@ -14,5 +14,10 @@ script = ExtResource("1_1sojc")
 polygon = PackedVector2Array(0, -28, 18, 22, 0, 12, -18, 22)
 color = Color(0.9, 0.95, 1, 1)
 
+[node name="ThrustFlame" type="Polygon2D" parent="."]
+visible = false
+polygon = PackedVector2Array(-8, 22, 0, 44, 8, 22)
+color = Color(1, 0.482353, 0.156863, 1)
+
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("ConvexPolygonShape2D_jvily")
