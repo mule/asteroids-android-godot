@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://bqsky4x01tinn"]
+[gd_scene load_steps=10 format=3 uid="uid://bqsky4x01tinn"]
 
 [ext_resource type="Script" path="res://scripts/game.gd" id="1_m6aai"]
 [ext_resource type="PackedScene" path="res://scenes/entities/PlayerShip.tscn" id="2_mgmqj"]
@@ -6,6 +6,8 @@
 [ext_resource type="PackedScene" path="res://scenes/entities/Bullet.tscn" id="4_1nphu"]
 [ext_resource type="PackedScene" path="res://scenes/ui/Hud.tscn" id="5_nl3g0"]
 [ext_resource type="Script" path="res://scripts/player_input.gd" id="6_8dbn6"]
+[ext_resource type="Script" path="res://scripts/starfield.gd" id="7_3jtpl"]
+[ext_resource type="Script" path="res://scripts/feedback.gd" id="8_s7x2j"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_xh3dq"]
 size = Vector2(1152, 648)
@@ -20,6 +22,9 @@ bullet_scene = ExtResource("4_1nphu")
 offset_right = 1152.0
 offset_bottom = 648.0
 color = Color(0.0352941, 0.0392157, 0.0588235, 1)
+
+[node name="Starfield" type="Node2D" parent="."]
+script = ExtResource("7_3jtpl")
 
 [node name="PlayArea" type="Area2D" parent="."]
 collision_layer = 0
@@ -36,8 +41,25 @@ process_mode = 1
 [node name="PlayerShip" parent="Entities" instance=ExtResource("2_mgmqj")]
 position = Vector2(576, 324)
 
+[node name="Effects" type="Node2D" parent="."]
+
 [node name="PlayerInput" type="Node" parent="."]
 process_mode = 3
 script = ExtResource("6_8dbn6")
+
+[node name="ScreenEffects" type="CanvasLayer" parent="."]
+layer = 20
+
+[node name="Flash" type="ColorRect" parent="ScreenEffects"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 0)
+
+[node name="Feedback" type="Node" parent="."]
+script = ExtResource("8_s7x2j")
 
 [node name="Hud" parent="." instance=ExtResource("5_nl3g0")]

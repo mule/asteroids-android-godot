@@ -20,6 +20,7 @@ const ASTEROID_SMALL := 2
 @onready var entities: Node2D = $Entities
 @onready var player_ship: Area2D = $Entities/PlayerShip
 @onready var player_input: Node = $PlayerInput
+@onready var feedback: Node = $Feedback
 @onready var hud: CanvasLayer = $Hud
 
 var random := RandomNumberGenerator.new()
@@ -55,6 +56,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _start_new_game() -> void:
 	_clear_dynamic_entities()
+	feedback.clear_effects()
 	score = starting_score
 	lives = starting_lives
 	wave = starting_wave
@@ -67,6 +69,7 @@ func _start_new_game() -> void:
 	_update_hud()
 	_respawn_player(false)
 	_spawn_wave()
+	feedback.spawn_wave_flash()
 
 
 func _on_player_ship_shoot_requested(
@@ -85,12 +88,15 @@ func _on_player_ship_shoot_requested(
 	if bullet.has_method("launch"):
 		bullet.launch(direction, inherited_velocity)
 
+	feedback.spawn_muzzle_flash(muzzle_position, direction)
+
 
 func _on_player_ship_area_entered(area: Area2D) -> void:
 	if not play_active or paused or respawning or not area.is_in_group("asteroids"):
 		return
 
 	lives = max(0, lives - 1)
+	feedback.spawn_player_hit(player_ship.global_position)
 	_update_hud()
 	_clear_bullets()
 
@@ -136,6 +142,7 @@ func _on_asteroid_destroyed(
 		return
 
 	score += _get_score_value(size_tier)
+	feedback.spawn_asteroid_burst(hit_position, size_tier)
 	_update_hud()
 
 	if size_tier < ASTEROID_SMALL:
@@ -170,6 +177,7 @@ func _respawn_player(use_invulnerability_timer: bool) -> void:
 	player_ship.reset_for_respawn(get_viewport_rect().get_center())
 	player_ship.set_controls_enabled(true)
 	player_ship.set_invulnerable(use_invulnerability_timer)
+	feedback.spawn_respawn_ring(player_ship.global_position)
 	respawning = false
 
 	if use_invulnerability_timer:
@@ -201,6 +209,7 @@ func _check_wave_cleared() -> void:
 	_update_hud()
 	_clear_bullets()
 	_spawn_wave()
+	feedback.spawn_wave_flash()
 
 
 func _clear_dynamic_entities() -> void:
