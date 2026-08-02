@@ -1,10 +1,11 @@
-[gd_scene load_steps=7 format=3 uid="uid://bqsky4x01tinn"]
+[gd_scene load_steps=8 format=3 uid="uid://bqsky4x01tinn"]
 
 [ext_resource type="Script" path="res://scripts/game.gd" id="1_m6aai"]
 [ext_resource type="PackedScene" path="res://scenes/entities/PlayerShip.tscn" id="2_mgmqj"]
 [ext_resource type="PackedScene" path="res://scenes/entities/Asteroid.tscn" id="3_tct56"]
 [ext_resource type="PackedScene" path="res://scenes/entities/Bullet.tscn" id="4_1nphu"]
 [ext_resource type="PackedScene" path="res://scenes/ui/Hud.tscn" id="5_nl3g0"]
+[ext_resource type="Script" path="res://scripts/player_input.gd" id="6_8dbn6"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_xh3dq"]
 size = Vector2(1152, 648)
@@ -34,5 +35,9 @@ process_mode = 1
 
 [node name="PlayerShip" parent="Entities" instance=ExtResource("2_mgmqj")]
 position = Vector2(576, 324)
+
+[node name="PlayerInput" type="Node" parent="."]
+process_mode = 3
+script = ExtResource("6_8dbn6")
 
 [node name="Hud" parent="." instance=ExtResource("5_nl3g0")]

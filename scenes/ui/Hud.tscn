@@ -106,3 +106,68 @@ custom_minimum_size = Vector2(112, 44)
 layout_mode = 2
 focus_mode = 0
 text = "Restart"
+
+[node name="TouchControls" type="Control" parent="Root"]
+visible = false
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+offset_top = -118.0
+offset_right = -18.0
+offset_bottom = -18.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="LeftCluster" type="HBoxContainer" parent="Root/TouchControls"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 0.0
+anchor_bottom = 1.0
+offset_top = -88.0
+offset_right = 178.0
+offset_bottom = 0.0
+grow_vertical = 0
+theme_override_constants/separation = 12
+
+[node name="RotateLeftButton" type="Button" parent="Root/TouchControls/LeftCluster"]
+custom_minimum_size = Vector2(82, 82)
+layout_mode = 2
+focus_mode = 0
+text = "<"
+
+[node name="RotateRightButton" type="Button" parent="Root/TouchControls/LeftCluster"]
+custom_minimum_size = Vector2(82, 82)
+layout_mode = 2
+focus_mode = 0
+text = ">"
+
+[node name="RightCluster" type="HBoxContainer" parent="Root/TouchControls"]
+layout_mode = 1
+anchors_preset = 14
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -204.0
+offset_top = -88.0
+offset_bottom = 0.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_constants/separation = 12
+
+[node name="ThrustButton" type="Button" parent="Root/TouchControls/RightCluster"]
+custom_minimum_size = Vector2(92, 82)
+layout_mode = 2
+focus_mode = 0
+text = "Thrust"
+
+[node name="ShootButton" type="Button" parent="Root/TouchControls/RightCluster"]
+custom_minimum_size = Vector2(92, 82)
+layout_mode = 2
+focus_mode = 0
+text = "Shoot"
