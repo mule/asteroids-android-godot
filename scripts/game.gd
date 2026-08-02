@@ -26,6 +26,7 @@ var score: int = 0
 var lives: int = 0
 var wave: int = 0
 var play_active: bool = false
+var paused: bool = false
 var respawning: bool = false
 
 
@@ -33,10 +34,19 @@ func _ready() -> void:
 	random.seed = random_seed
 	player_ship.shoot_requested.connect(_on_player_ship_shoot_requested)
 	player_ship.area_entered.connect(_on_player_ship_area_entered)
+	hud.pause_requested.connect(_pause_game)
+	hud.resume_requested.connect(_resume_game)
+	hud.restart_requested.connect(_start_new_game)
 	_start_new_game()
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if play_active and event.is_action_pressed("pause"):
+		if paused:
+			_resume_game()
+		else:
+			_pause_game()
+
 	if not play_active and event.is_action_pressed("restart"):
 		_start_new_game()
 
@@ -47,8 +57,11 @@ func _start_new_game() -> void:
 	lives = starting_lives
 	wave = starting_wave
 	play_active = true
+	paused = false
 	respawning = false
+	get_tree().paused = false
 	hud.hide_status()
+	hud.set_pause_available(true)
 	_update_hud()
 	_respawn_player(false)
 	_spawn_wave()
@@ -59,7 +72,7 @@ func _on_player_ship_shoot_requested(
 	direction: Vector2,
 	inherited_velocity: Vector2
 ) -> void:
-	if not play_active or respawning:
+	if not play_active or paused or respawning:
 		return
 
 	var bullet := bullet_scene.instantiate()
@@ -72,7 +85,7 @@ func _on_player_ship_shoot_requested(
 
 
 func _on_player_ship_area_entered(area: Area2D) -> void:
-	if not play_active or respawning or not area.is_in_group("asteroids"):
+	if not play_active or paused or respawning or not area.is_in_group("asteroids"):
 		return
 
 	lives = max(0, lives - 1)
@@ -97,12 +110,13 @@ func _spawn_wave() -> void:
 
 func _spawn_asteroid(size_tier: int, spawn_position: Vector2, velocity: Vector2) -> Area2D:
 	var asteroid := asteroid_scene.instantiate() as Area2D
-	entities.add_child(asteroid)
-	asteroid.add_to_group("asteroids")
-	asteroid.global_position = spawn_position
 
 	if asteroid.has_method("setup"):
 		asteroid.setup(size_tier, velocity)
+
+	entities.add_child(asteroid)
+	asteroid.add_to_group("asteroids")
+	asteroid.global_position = spawn_position
 
 	if asteroid.has_signal("destroyed"):
 		asteroid.destroyed.connect(_on_asteroid_destroyed)
@@ -124,12 +138,18 @@ func _on_asteroid_destroyed(
 
 	if size_tier < ASTEROID_SMALL:
 		var next_size := size_tier + 1
-
-		for index in split_child_count:
-			var velocity := _get_split_velocity(next_size, incoming_velocity, index)
-			_spawn_asteroid(next_size, hit_position, velocity)
+		call_deferred("_spawn_split_asteroids", next_size, hit_position, incoming_velocity)
 
 	call_deferred("_check_wave_cleared")
+
+
+func _spawn_split_asteroids(size_tier: int, hit_position: Vector2, incoming_velocity: Vector2) -> void:
+	if not play_active:
+		return
+
+	for index in split_child_count:
+		var velocity := _get_split_velocity(size_tier, incoming_velocity, index)
+		_spawn_asteroid(size_tier, hit_position, velocity)
 
 
 func _begin_respawn() -> void:
@@ -162,7 +182,9 @@ func _end_invulnerability_after_delay() -> void:
 
 
 func _end_game() -> void:
+	get_tree().paused = false
 	play_active = false
+	paused = false
 	respawning = false
 	player_ship.set_controls_enabled(false)
 	player_ship.set_invulnerable(true)
@@ -170,7 +192,7 @@ func _end_game() -> void:
 
 
 func _check_wave_cleared() -> void:
-	if not play_active or _get_active_asteroid_count() > 0:
+	if not play_active or paused or _get_active_asteroid_count() > 0:
 		return
 
 	wave += 1
@@ -204,6 +226,24 @@ func _update_hud() -> void:
 	hud.set_score(score)
 	hud.set_lives(lives)
 	hud.set_wave(wave)
+
+
+func _pause_game() -> void:
+	if not play_active or paused:
+		return
+
+	paused = true
+	get_tree().paused = true
+	hud.show_paused()
+
+
+func _resume_game() -> void:
+	if not play_active or not paused:
+		return
+
+	paused = false
+	get_tree().paused = false
+	hud.hide_status()
 
 
 func _get_safe_spawn_position(index: int, asteroid_count: int) -> Vector2:
