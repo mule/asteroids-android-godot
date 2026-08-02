@@ -10,6 +10,7 @@
 size = Vector2(1152, 648)
 
 [node name="Game" type="Node2D"]
+process_mode = 3
 script = ExtResource("1_m6aai")
 asteroid_scene = ExtResource("3_tct56")
 bullet_scene = ExtResource("4_1nphu")
@@ -29,6 +30,7 @@ shape = SubResource("RectangleShape2D_xh3dq")
 debug_color = Color(0.2, 0.7, 1, 0.15)
 
 [node name="Entities" type="Node2D" parent="."]
+process_mode = 1
 
 [node name="PlayerShip" parent="Entities" instance=ExtResource("2_mgmqj")]
 position = Vector2(576, 324)

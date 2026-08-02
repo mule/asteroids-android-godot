@@ -3,6 +3,7 @@
 [ext_resource type="Script" path="res://scripts/hud.gd" id="1_h8hhe"]
 
 [node name="Hud" type="CanvasLayer"]
+process_mode = 3
 script = ExtResource("1_h8hhe")
 
 [node name="Root" type="Control" parent="."]
@@ -17,24 +18,40 @@ grow_vertical = 2
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_left = 16.0
-offset_top = 12.0
-offset_right = -16.0
-offset_bottom = 44.0
+offset_left = 12.0
+offset_top = 10.0
+offset_right = -12.0
+offset_bottom = 58.0
 grow_horizontal = 2
-theme_override_constants/separation = 24
+theme_override_constants/separation = 10
+alignment = 1
 
 [node name="ScoreLabel" type="Label" parent="Root/TopBar"]
 layout_mode = 2
+size_flags_horizontal = 3
 text = "Score 0"
 
 [node name="LivesLabel" type="Label" parent="Root/TopBar"]
 layout_mode = 2
+size_flags_horizontal = 3
 text = "Lives 3"
 
 [node name="WaveLabel" type="Label" parent="Root/TopBar"]
 layout_mode = 2
+size_flags_horizontal = 3
 text = "Wave 1"
+
+[node name="PauseButton" type="Button" parent="Root/TopBar"]
+custom_minimum_size = Vector2(72, 44)
+layout_mode = 2
+focus_mode = 0
+text = "Pause"
+
+[node name="RestartButton" type="Button" parent="Root/TopBar"]
+custom_minimum_size = Vector2(82, 44)
+layout_mode = 2
+focus_mode = 0
+text = "Restart"
 
 [node name="StatusPanel" type="PanelContainer" parent="Root"]
 visible = false
@@ -44,23 +61,24 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -150.0
-offset_top = -54.0
-offset_right = 150.0
-offset_bottom = 54.0
+offset_left = -168.0
+offset_top = -88.0
+offset_right = 168.0
+offset_bottom = 88.0
 grow_horizontal = 2
 grow_vertical = 2
 
 [node name="MarginContainer" type="MarginContainer" parent="Root/StatusPanel"]
 layout_mode = 2
-theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 12
-theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 12
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 16
 
 [node name="VBoxContainer" type="VBoxContainer" parent="Root/StatusPanel/MarginContainer"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 10
+alignment = 1
 
 [node name="StatusTitleLabel" type="Label" parent="Root/StatusPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
@@ -70,4 +88,21 @@ text = "Game Over"
 [node name="StatusBodyLabel" type="Label" parent="Root/StatusPanel/MarginContainer/VBoxContainer"]
 layout_mode = 2
 horizontal_alignment = 1
-text = "Press R or Enter to restart"
+text = "Score 0  Wave 1"
+
+[node name="OverlayActions" type="HBoxContainer" parent="Root/StatusPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="ResumeButton" type="Button" parent="Root/StatusPanel/MarginContainer/VBoxContainer/OverlayActions"]
+custom_minimum_size = Vector2(112, 44)
+layout_mode = 2
+focus_mode = 0
+text = "Resume"
+
+[node name="OverlayRestartButton" type="Button" parent="Root/StatusPanel/MarginContainer/VBoxContainer/OverlayActions"]
+custom_minimum_size = Vector2(112, 44)
+layout_mode = 2
+focus_mode = 0
+text = "Restart"

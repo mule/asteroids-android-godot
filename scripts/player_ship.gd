@@ -99,6 +99,6 @@ func set_controls_enabled(value: bool) -> void:
 
 func set_invulnerable(value: bool) -> void:
 	invulnerable = value
-	monitoring = not value
-	monitorable = not value
+	set_deferred("monitoring", not value)
+	set_deferred("monitorable", not value)
 	modulate = Color(1.0, 1.0, 1.0, 0.45) if value else Color.WHITE
