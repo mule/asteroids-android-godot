@@ -19,6 +19,7 @@ const ASTEROID_SMALL := 2
 
 @onready var entities: Node2D = $Entities
 @onready var player_ship: Area2D = $Entities/PlayerShip
+@onready var player_input: Node = $PlayerInput
 @onready var hud: CanvasLayer = $Hud
 
 var random := RandomNumberGenerator.new()
@@ -37,6 +38,7 @@ func _ready() -> void:
 	hud.pause_requested.connect(_pause_game)
 	hud.resume_requested.connect(_resume_game)
 	hud.restart_requested.connect(_start_new_game)
+	hud.touch_action_changed.connect(_on_hud_touch_action_changed)
 	_start_new_game()
 
 
@@ -233,6 +235,7 @@ func _pause_game() -> void:
 		return
 
 	paused = true
+	player_input.clear_touch_actions()
 	get_tree().paused = true
 	hud.show_paused()
 
@@ -244,6 +247,10 @@ func _resume_game() -> void:
 	paused = false
 	get_tree().paused = false
 	hud.hide_status()
+
+
+func _on_hud_touch_action_changed(action: StringName, pressed: bool) -> void:
+	player_input.set_touch_action(action, pressed)
 
 
 func _get_safe_spawn_position(index: int, asteroid_count: int) -> Vector2:

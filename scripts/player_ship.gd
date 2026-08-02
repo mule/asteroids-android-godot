@@ -10,8 +10,10 @@ signal shoot_requested(muzzle_position: Vector2, direction: Vector2, inherited_v
 @export var wrap_margin: float = 32.0
 @export var fire_cooldown_seconds: float = 0.18
 @export var muzzle_distance: float = 34.0
+@export var input_source_path: NodePath = ^"../../PlayerInput"
 
 @onready var thrust_flame: Polygon2D = $ThrustFlame
+@onready var input_source: Node = get_node_or_null(input_source_path)
 
 var velocity: Vector2 = Vector2.ZERO
 var fire_cooldown_remaining: float = 0.0
@@ -33,12 +35,12 @@ func _physics_process(delta: float) -> void:
 
 
 func _apply_rotation_input(delta: float) -> void:
-	var turn_input := Input.get_axis("rotate_left", "rotate_right")
+	var turn_input := _get_turn_axis()
 	rotation += deg_to_rad(turn_speed_degrees) * turn_input * delta
 
 
 func _apply_thrust_input(delta: float) -> void:
-	var is_thrusting := Input.is_action_pressed("thrust")
+	var is_thrusting := _is_thrust_pressed()
 	thrust_flame.visible = is_thrusting
 
 	if is_thrusting:
@@ -47,7 +49,7 @@ func _apply_thrust_input(delta: float) -> void:
 
 
 func _apply_shoot_input() -> void:
-	if not Input.is_action_pressed("shoot") or fire_cooldown_remaining > 0.0:
+	if not _is_shoot_pressed() or fire_cooldown_remaining > 0.0:
 		return
 
 	var direction := Vector2.UP.rotated(global_rotation)
@@ -58,6 +60,27 @@ func _apply_shoot_input() -> void:
 
 func _update_fire_cooldown(delta: float) -> void:
 	fire_cooldown_remaining = maxf(0.0, fire_cooldown_remaining - delta)
+
+
+func _get_turn_axis() -> float:
+	if input_source != null and input_source.has_method("get_turn_axis"):
+		return input_source.get_turn_axis()
+
+	return Input.get_axis("rotate_left", "rotate_right")
+
+
+func _is_thrust_pressed() -> bool:
+	if input_source != null and input_source.has_method("is_thrust_pressed"):
+		return input_source.is_thrust_pressed()
+
+	return Input.is_action_pressed("thrust")
+
+
+func _is_shoot_pressed() -> bool:
+	if input_source != null and input_source.has_method("is_shoot_pressed"):
+		return input_source.is_shoot_pressed()
+
+	return Input.is_action_pressed("shoot")
 
 
 func _apply_drift(delta: float) -> void:
