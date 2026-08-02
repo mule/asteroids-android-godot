@@ -15,9 +15,14 @@ signal shoot_requested(muzzle_position: Vector2, direction: Vector2, inherited_v
 
 var velocity: Vector2 = Vector2.ZERO
 var fire_cooldown_remaining: float = 0.0
+var controls_enabled: bool = true
+var invulnerable: bool = false
 
 
 func _physics_process(delta: float) -> void:
+	if not controls_enabled:
+		return
+
 	_update_fire_cooldown(delta)
 	_apply_rotation_input(delta)
 	_apply_thrust_input(delta)
@@ -77,3 +82,23 @@ func _wrap_to_visible_viewport() -> void:
 		position.y = max_position.y
 	elif position.y > max_position.y:
 		position.y = min_position.y
+
+
+func reset_for_respawn(spawn_position: Vector2) -> void:
+	global_position = spawn_position
+	rotation = 0.0
+	velocity = Vector2.ZERO
+	fire_cooldown_remaining = 0.0
+	thrust_flame.visible = false
+
+
+func set_controls_enabled(value: bool) -> void:
+	controls_enabled = value
+	thrust_flame.visible = false
+
+
+func set_invulnerable(value: bool) -> void:
+	invulnerable = value
+	monitoring = not value
+	monitorable = not value
+	modulate = Color(1.0, 1.0, 1.0, 0.45) if value else Color.WHITE
