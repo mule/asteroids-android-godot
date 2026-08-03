@@ -9,3 +9,7 @@ art/rejected/**
 !art/rejected/.gitkeep
 art/experiments/**
 !art/experiments/.gitkeep
+
+# Python tooling caches
+__pycache__/
+*.py[cod]

@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mule/asteroids-android-godot/art/schemas/vector-asset.schema.json",
+  "title": "Asteroids Vector Asset Source Specification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "asset_id",
+    "category",
+    "primary_polygon",
+    "fill_color",
+    "provenance",
+    "approval"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "vector-asset/v1"
+    },
+    "asset_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(_[a-z0-9]+)*_[0-9]{2}$"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["ship", "asteroid", "bullet"]
+    },
+    "primary_polygon": {
+      "$ref": "#/$defs/polygon"
+    },
+    "fill_color": {
+      "$ref": "#/$defs/color"
+    },
+    "outline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["color", "width"],
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/color"
+        },
+        "width": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 16
+        }
+      }
+    },
+    "secondary_polygons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["polygon_id", "polygon", "fill_color"],
+        "properties": {
+          "polygon_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+          },
+          "polygon": {
+            "$ref": "#/$defs/polygon"
+          },
+          "fill_color": {
+            "$ref": "#/$defs/color"
+          },
+          "visible_by_default": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "default": []
+    },
+    "collision": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "polygon"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "convex_polygon"
+            },
+            "polygon": {
+              "$ref": "#/$defs/polygon"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "radius"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "circle"
+            },
+            "radius": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "requires_symmetry": {
+      "type": "boolean",
+      "default": false
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+      },
+      "uniqueItems": true,
+      "default": []
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generator",
+        "model",
+        "prompt_file",
+        "prompt_revision",
+        "created_at",
+        "seed",
+        "manual_edits",
+        "source_license",
+        "notes"
+      ],
+      "properties": {
+        "generator": { "type": "string" },
+        "model": { "type": "string" },
+        "prompt_file": { "type": "string" },
+        "prompt_revision": { "type": "string" },
+        "created_at": { "type": "string" },
+        "seed": { "type": ["string", "number", "null"] },
+        "manual_edits": { "type": "string" },
+        "source_license": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reviewer"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["draft", "approved", "rejected"]
+        },
+        "reviewer": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "color": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number", "minimum": 0, "maximum": 1 },
+        { "type": "number", "minimum": 0, "maximum": 1 },
+        { "type": "number", "minimum": 0, "maximum": 1 },
+        { "type": "number", "minimum": 0, "maximum": 1 }
+      ],
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "point": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number" },
+        { "type": "number" }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "polygon": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/point"
+      },
+      "minItems": 3
+    }
+  }
+}
