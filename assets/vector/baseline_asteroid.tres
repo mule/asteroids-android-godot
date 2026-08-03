@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="VectorAssetDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_definition.gd" id="1_g32aq"]
+
+[resource]
+script = ExtResource("1_g32aq")
+asset_id = &"asteroid_baseline_01"
+category = 1
+primary_polygon = PackedVector2Array(-36, -24, -10, -42, 28, -34, 44, -4, 30, 34, -8, 42, -42, 16)
+fill_color = Color(0.58, 0.6, 0.66, 1)
+collision_radius = 44.0
+tags = PackedStringArray("baseline", "rock")
+provenance_reference = "scenes/entities/Asteroid.tscn before issue #24"

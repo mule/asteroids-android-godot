@@ -3,6 +3,7 @@ extends Area2D
 
 signal shoot_requested(muzzle_position: Vector2, direction: Vector2, inherited_velocity: Vector2)
 
+@export var visual_asset: Resource = preload("res://assets/vector/baseline_ship.tres")
 @export var acceleration: float = 360.0
 @export var max_speed: float = 520.0
 @export var turn_speed_degrees: float = 180.0
@@ -12,13 +13,19 @@ signal shoot_requested(muzzle_position: Vector2, direction: Vector2, inherited_v
 @export var muzzle_distance: float = 34.0
 @export var input_source_path: NodePath = ^"../../PlayerInput"
 
+@onready var ship_shape: Polygon2D = $ShipShape
 @onready var thrust_flame: Polygon2D = $ThrustFlame
+@onready var collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var input_source: Node = get_node_or_null(input_source_path)
 
 var velocity: Vector2 = Vector2.ZERO
 var fire_cooldown_remaining: float = 0.0
 var controls_enabled: bool = true
 var invulnerable: bool = false
+
+
+func _ready() -> void:
+	_apply_visual_asset()
 
 
 func _physics_process(delta: float) -> void:
@@ -125,3 +132,26 @@ func set_invulnerable(value: bool) -> void:
 	set_deferred("monitoring", not value)
 	set_deferred("monitorable", not value)
 	modulate = Color(1.0, 1.0, 1.0, 0.45) if value else Color.WHITE
+
+
+func _apply_visual_asset() -> void:
+	if (
+		visual_asset == null
+		or not visual_asset.has_method("is_primary_polygon_valid")
+		or not visual_asset.is_primary_polygon_valid()
+	):
+		return
+
+	ship_shape.polygon = visual_asset.primary_polygon
+	ship_shape.color = visual_asset.fill_color
+
+	var flame_asset: Resource = visual_asset.get_secondary_polygon(&"thrust_flame")
+	if flame_asset != null and flame_asset.is_valid():
+		thrust_flame.polygon = flame_asset.polygon
+		thrust_flame.color = flame_asset.fill_color
+		thrust_flame.visible = flame_asset.visible_by_default
+
+	if visual_asset.use_collision_polygon and visual_asset.collision_polygon.size() >= 3:
+		var ship_collision := ConvexPolygonShape2D.new()
+		ship_collision.points = visual_asset.collision_polygon
+		collision_shape.shape = ship_collision

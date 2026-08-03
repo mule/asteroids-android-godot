@@ -67,6 +67,10 @@ issue explicitly asks for them.
 - Raw model response payloads, provider caches, and unreviewed generated files
   are not production assets.
 
+Runtime vector resources live under `assets/vector/`. These `.tres` files are
+Godot-ready transforms of approved source definitions; entity scenes may assign
+them through exported `visual_asset` properties.
+
 ## Asset IDs and file names
 
 Use lowercase snake case for every asset ID and file stem:
@@ -136,3 +140,16 @@ Runtime asset integration work must also use the Android export guide:
 
 - [Android export guide](android-export.md)
 
+## Adding a vector gameplay variant
+
+1. Add or update the approved source specification under `art/approved/`.
+2. Generate a Godot `VectorAssetDefinition` resource under `assets/vector/`.
+3. Confirm the resource has an `asset_id`, category, primary polygon, fill
+   color, and provenance reference.
+4. For ships, include a `thrust_flame` secondary polygon if the variant needs
+   thrust feedback, and include a convex collision polygon when collision data
+   differs from the scene fallback.
+5. Assign the `.tres` resource to the entity scene's exported `visual_asset`
+   property or to a scene instance used for review.
+6. Run the desktop and Android verification expected by the task that changes
+   runtime assets.

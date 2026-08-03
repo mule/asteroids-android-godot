@@ -1,15 +1,19 @@
 extends Area2D
 
 
+@export var visual_asset: Resource = preload("res://assets/vector/baseline_bullet.tres")
 @export var speed: float = 760.0
 @export var lifetime_seconds: float = 1.2
 @export var wrap_margin: float = 8.0
+
+@onready var bullet_shape: Polygon2D = $BulletShape
 
 var velocity: Vector2 = Vector2.ZERO
 var lifetime_remaining: float = 0.0
 
 
 func _ready() -> void:
+	_apply_visual_asset()
 	lifetime_remaining = lifetime_seconds
 	area_entered.connect(_on_area_entered)
 
@@ -50,3 +54,15 @@ func _wrap_to_visible_viewport() -> void:
 		position.y = max_position.y
 	elif position.y > max_position.y:
 		position.y = min_position.y
+
+
+func _apply_visual_asset() -> void:
+	if (
+		visual_asset == null
+		or not visual_asset.has_method("is_primary_polygon_valid")
+		or not visual_asset.is_primary_polygon_valid()
+	):
+		return
+
+	bullet_shape.polygon = visual_asset.primary_polygon
+	bullet_shape.color = visual_asset.fill_color
