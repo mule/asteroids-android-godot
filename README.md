@@ -81,5 +81,10 @@ Prefer leaving generated files, editor caches, and local IDE state out of commit
 Planning lives in GitHub issues:
 
 - [Epic: Build a playable Asteroids Android practice game in Godot](https://github.com/mule/asteroids-android-godot/issues/11)
+- [Epic: Build a reproducible AI-assisted game asset pipeline](https://github.com/mule/asteroids-android-godot/issues/22)
 - [Open task list](https://github.com/mule/asteroids-android-godot/issues)
 
+Asset pipeline conventions live in:
+
+- [Asset pipeline contract](docs/asset-pipeline.md)
+- [Art style guide](docs/art-style-guide.md)

@@ -1,3 +1,11 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+
+# AI/provider asset pipeline scratch output
+art/generated/**
+!art/generated/.gitkeep
+art/rejected/**
+!art/rejected/.gitkeep
+art/experiments/**
+!art/experiments/.gitkeep
