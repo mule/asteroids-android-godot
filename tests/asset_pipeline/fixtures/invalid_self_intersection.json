@@ -1,0 +1,22 @@
+{
+  "schema_version": "vector-asset/v1",
+  "asset_id": "asteroid_bowtie_01",
+  "category": "asteroid",
+  "primary_polygon": [[-20, -20], [20, 20], [-20, 20], [20, -20]],
+  "fill_color": [0.5, 0.5, 0.5, 1.0],
+  "provenance": {
+    "generator": "manual",
+    "model": "none",
+    "prompt_file": "unknown",
+    "prompt_revision": "test",
+    "created_at": "2026-08-03",
+    "seed": null,
+    "manual_edits": "Test fixture.",
+    "source_license": "project-owned",
+    "notes": "Invalid self-intersecting fixture."
+  },
+  "approval": {
+    "status": "draft",
+    "reviewer": "test"
+  }
+}

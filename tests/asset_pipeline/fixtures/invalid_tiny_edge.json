@@ -1,0 +1,22 @@
+{
+  "schema_version": "vector-asset/v1",
+  "asset_id": "bullet_tiny_edge_01",
+  "category": "bullet",
+  "primary_polygon": [[0, -8], [0.01, -8], [6, 0], [0, 8], [-6, 0]],
+  "fill_color": [1.0, 0.95, 0.42, 1.0],
+  "provenance": {
+    "generator": "manual",
+    "model": "none",
+    "prompt_file": "unknown",
+    "prompt_revision": "test",
+    "created_at": "2026-08-03",
+    "seed": null,
+    "manual_edits": "Test fixture.",
+    "source_license": "project-owned",
+    "notes": "Invalid tiny edge fixture."
+  },
+  "approval": {
+    "status": "draft",
+    "reviewer": "test"
+  }
+}

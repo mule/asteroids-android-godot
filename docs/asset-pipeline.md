@@ -153,3 +153,38 @@ Runtime asset integration work must also use the Android export guide:
    property or to a scene instance used for review.
 6. Run the desktop and Android verification expected by the task that changes
    runtime assets.
+
+## Validating vector source assets
+
+Vector source specifications use the schema at
+`art/schemas/vector-asset.schema.json`. The validator is intentionally
+editor-independent and uses the Python standard library.
+
+Validate all approved source assets:
+
+```sh
+python3 tools/asset_pipeline/validate_assets.py art/approved
+```
+
+Validate one candidate file:
+
+```sh
+python3 tools/asset_pipeline/validate_assets.py art/generated/ship_candidate_01.json
+```
+
+Emit deterministic normalized JSON to stdout:
+
+```sh
+python3 tools/asset_pipeline/validate_assets.py art/approved/ship_baseline_01.json --normalize
+```
+
+Write normalized JSON files into a staging directory:
+
+```sh
+python3 tools/asset_pipeline/validate_assets.py art/approved --output-dir /tmp/asteroids-normalized-assets
+```
+
+The validator exits non-zero for malformed metadata, duplicate asset IDs,
+degenerate polygons, self-intersections, unsupported categories, oversized
+bounds, off-center primary polygons, invalid ship orientation, asymmetric assets
+that require symmetry, and non-convex collision polygons.
