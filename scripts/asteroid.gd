@@ -9,6 +9,7 @@ enum AsteroidSize {
 	SMALL,
 }
 
+@export var visual_asset: Resource = preload("res://assets/vector/baseline_asteroid.tres")
 @export_enum("Large", "Medium", "Small") var size_tier: int = AsteroidSize.LARGE
 @export var drift_speed: float = 90.0
 @export var rotation_speed_degrees: float = 25.0
@@ -21,6 +22,7 @@ var velocity: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
+	_apply_visual_asset()
 	_apply_size_tier()
 
 
@@ -58,6 +60,18 @@ func _apply_size_tier() -> void:
 		var circle_shape := collision_shape.shape.duplicate() as CircleShape2D
 		circle_shape.radius = _get_collision_radius()
 		collision_shape.shape = circle_shape
+
+
+func _apply_visual_asset() -> void:
+	if (
+		visual_asset == null
+		or not visual_asset.has_method("is_primary_polygon_valid")
+		or not visual_asset.is_primary_polygon_valid()
+	):
+		return
+
+	rock_shape.polygon = visual_asset.primary_polygon
+	rock_shape.color = visual_asset.fill_color
 
 
 func _get_visual_scale() -> float:

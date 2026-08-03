@@ -1,6 +1,7 @@
-[gd_scene load_steps=3 format=3 uid="uid://b7t0ntavgjg84"]
+[gd_scene load_steps=4 format=3 uid="uid://b7t0ntavgjg84"]
 
 [ext_resource type="Script" path="res://scripts/bullet.gd" id="1_ckiq4"]
+[ext_resource type="Resource" path="res://assets/vector/baseline_bullet.tres" id="2_b1ffi"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_8nxps"]
 radius = 5.0
@@ -9,6 +10,7 @@ radius = 5.0
 collision_layer = 8
 collision_mask = 4
 script = ExtResource("1_ckiq4")
+visual_asset = ExtResource("2_b1ffi")
 
 [node name="BulletShape" type="Polygon2D" parent="."]
 polygon = PackedVector2Array(0, -8, 6, 0, 0, 8, -6, 0)
