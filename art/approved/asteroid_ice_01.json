@@ -1,0 +1,40 @@
+{
+  "schema_version": "vector-asset/v1",
+  "asset_id": "asteroid_ice_01",
+  "category": "asteroid",
+  "primary_polygon": [[-34, -34], [2, -50], [38, -30], [48, 4], [24, 42], [-18, 44], [-48, 10]],
+  "fill_color": [0.62, 0.78, 0.9, 1.0],
+  "material": {
+    "material_id": "asteroid_faceted_ice",
+    "shader_mode": "asteroid_faceted",
+    "base_tint": [0.78, 0.92, 1.0, 1.0],
+    "ambient": 0.4,
+    "diffuse_strength": 0.62,
+    "light_band_count": 4,
+    "highlight_strength": 0.16,
+    "noise_seed": 4337,
+    "noise_scale": 0.038,
+    "noise_strength": 0.11,
+    "facet_strength": 0.5
+  },
+  "collision": {
+    "type": "circle",
+    "radius": 49
+  },
+  "tags": ["variant", "rock", "ice"],
+  "provenance": {
+    "generator": "manual",
+    "model": "none",
+    "prompt_file": "unknown",
+    "prompt_revision": "issue-26",
+    "created_at": "2026-08-04",
+    "seed": null,
+    "manual_edits": "Hand-authored cool-color asteroid variant for generated resource coverage.",
+    "source_license": "project-owned",
+    "notes": "Approved ice-toned asteroid variant with gentler noise."
+  },
+  "approval": {
+    "status": "approved",
+    "reviewer": "japurane"
+  }
+}

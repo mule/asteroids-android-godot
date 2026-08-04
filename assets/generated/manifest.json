@@ -1,0 +1,118 @@
+{
+  "assets": [
+    {
+      "asset_id": "asteroid_baseline_01",
+      "category": "asteroid",
+      "material_ids": [
+        "asteroid_faceted_baseline"
+      ],
+      "output_path": "assets/generated/asteroids/asteroid_baseline_01.tres",
+      "schema_version": "vector-asset/v1",
+      "source_path": "art/approved/asteroid_baseline_01.json",
+      "source_sha256": "1e62f2dffb7aa2058872a2d116bf3e7e2da9059509129edd44bf2c1228b9385c"
+    },
+    {
+      "asset_id": "asteroid_craggy_01",
+      "category": "asteroid",
+      "material_ids": [
+        "asteroid_faceted_craggy"
+      ],
+      "output_path": "assets/generated/asteroids/asteroid_craggy_01.tres",
+      "schema_version": "vector-asset/v1",
+      "source_path": "art/approved/asteroid_craggy_01.json",
+      "source_sha256": "3e7f62208a2ee4772fac05ef2ac63e7204b7ac6676af844c421abcdfd5849c23"
+    },
+    {
+      "asset_id": "asteroid_ice_01",
+      "category": "asteroid",
+      "material_ids": [
+        "asteroid_faceted_ice"
+      ],
+      "output_path": "assets/generated/asteroids/asteroid_ice_01.tres",
+      "schema_version": "vector-asset/v1",
+      "source_path": "art/approved/asteroid_ice_01.json",
+      "source_sha256": "4c6a759a5444e735541577d9f800d55480a2228bc308051792d7f8c91fe64088"
+    },
+    {
+      "asset_id": "asteroid_iron_01",
+      "category": "asteroid",
+      "material_ids": [
+        "asteroid_faceted_iron"
+      ],
+      "output_path": "assets/generated/asteroids/asteroid_iron_01.tres",
+      "schema_version": "vector-asset/v1",
+      "source_path": "art/approved/asteroid_iron_01.json",
+      "source_sha256": "d92433974c616143cc73d1621a45af4b3400a20cd099998ececba0e90e1c7305"
+    },
+    {
+      "asset_id": "bullet_baseline_01",
+      "category": "bullet",
+      "material_ids": [
+        "bullet_emissive_baseline"
+      ],
+      "output_path": "assets/generated/bullets/bullet_baseline_01.tres",
+      "schema_version": "vector-asset/v1",
+      "source_path": "art/approved/bullet_baseline_01.json",
+      "source_sha256": "cfe1a2e3e529052107f5fcb83955d41c2c5b3ee6b2a5b863c286c5db54354188"
+    },
+    {
+      "asset_id": "ship_baseline_01",
+      "category": "ship",
+      "material_ids": [
+        "ship_lit_baseline",
+        "thrust_emissive_baseline"
+      ],
+      "output_path": "assets/generated/ships/ship_baseline_01.tres",
+      "schema_version": "vector-asset/v1",
+      "source_path": "art/approved/ship_baseline_01.json",
+      "source_sha256": "34a82db236481fa0f42bee3b126c5bfee3938027c6c9cb0af3fcbf495088d26e"
+    }
+  ],
+  "materials": [
+    {
+      "material_id": "asteroid_faceted_baseline",
+      "output_path": "assets/generated/materials/asteroid_faceted_baseline.tres",
+      "owner_asset_id": "asteroid_baseline_01",
+      "shader_mode": "asteroid_faceted"
+    },
+    {
+      "material_id": "asteroid_faceted_craggy",
+      "output_path": "assets/generated/materials/asteroid_faceted_craggy.tres",
+      "owner_asset_id": "asteroid_craggy_01",
+      "shader_mode": "asteroid_faceted"
+    },
+    {
+      "material_id": "asteroid_faceted_ice",
+      "output_path": "assets/generated/materials/asteroid_faceted_ice.tres",
+      "owner_asset_id": "asteroid_ice_01",
+      "shader_mode": "asteroid_faceted"
+    },
+    {
+      "material_id": "asteroid_faceted_iron",
+      "output_path": "assets/generated/materials/asteroid_faceted_iron.tres",
+      "owner_asset_id": "asteroid_iron_01",
+      "shader_mode": "asteroid_faceted"
+    },
+    {
+      "material_id": "bullet_emissive_baseline",
+      "output_path": "assets/generated/materials/bullet_emissive_baseline.tres",
+      "owner_asset_id": "bullet_baseline_01",
+      "shader_mode": "emissive"
+    },
+    {
+      "material_id": "ship_lit_baseline",
+      "output_path": "assets/generated/materials/ship_lit_baseline.tres",
+      "owner_asset_id": "ship_baseline_01",
+      "shader_mode": "lit_vector"
+    },
+    {
+      "material_id": "thrust_emissive_baseline",
+      "output_path": "assets/generated/materials/thrust_emissive_baseline.tres",
+      "owner_asset_id": "ship_baseline_01",
+      "shader_mode": "emissive"
+    }
+  ],
+  "output_dir": "assets/generated",
+  "schema_version": "vector-asset-build/v1",
+  "source_dir": "art/approved"
+}

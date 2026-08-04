@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="AssetMaterialDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/asset_material_definition.gd" id="1_material_definition"]
+[ext_resource type="Shader" path="res://assets/shaders/asteroid_faceted.gdshader" id="2_shader"]
+
+[resource]
+script = ExtResource("1_material_definition")
+material_id = &"asteroid_faceted_baseline"
+shader_mode = 2
+shader = ExtResource("2_shader")
+base_tint = Color(1, 1, 1, 1)
+ambient = 0.36
+diffuse_strength = 0.68
+light_band_count = 4
+highlight_strength = 0.06
+noise_seed = 1729
+noise_scale = 0.045
+noise_strength = 0.14
+facet_strength = 0.58

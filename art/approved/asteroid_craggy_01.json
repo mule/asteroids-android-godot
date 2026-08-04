@@ -1,0 +1,40 @@
+{
+  "schema_version": "vector-asset/v1",
+  "asset_id": "asteroid_craggy_01",
+  "category": "asteroid",
+  "primary_polygon": [[-44, -18], [-24, -42], [10, -48], [38, -28], [50, 6], [26, 38], [-12, 46], [-46, 22]],
+  "fill_color": [0.5, 0.52, 0.58, 1.0],
+  "material": {
+    "material_id": "asteroid_faceted_craggy",
+    "shader_mode": "asteroid_faceted",
+    "base_tint": [0.96, 0.98, 1.0, 1.0],
+    "ambient": 0.32,
+    "diffuse_strength": 0.74,
+    "light_band_count": 5,
+    "highlight_strength": 0.08,
+    "noise_seed": 2311,
+    "noise_scale": 0.052,
+    "noise_strength": 0.22,
+    "facet_strength": 0.68
+  },
+  "collision": {
+    "type": "circle",
+    "radius": 50
+  },
+  "tags": ["variant", "rock", "craggy"],
+  "provenance": {
+    "generator": "manual",
+    "model": "none",
+    "prompt_file": "unknown",
+    "prompt_revision": "issue-26",
+    "created_at": "2026-08-04",
+    "seed": null,
+    "manual_edits": "Hand-authored jagged silhouette variant for generated resource coverage.",
+    "source_license": "project-owned",
+    "notes": "Approved craggy asteroid variant with stronger faceting."
+  },
+  "approval": {
+    "status": "approved",
+    "reviewer": "japurane"
+  }
+}

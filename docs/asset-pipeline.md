@@ -76,6 +76,14 @@ Runtime material resources live under `assets/materials/`, with shaders under
 lighting bands, ambient/diffuse response, emission, and deterministic
 facet/noise parameters separately from polygon geometry.
 
+Generated runtime resources live under `assets/generated/`. The checked-in
+builder transforms approved source JSON into `VectorAssetDefinition` and
+`AssetMaterialDefinition` `.tres` files with deterministic formatting and a
+manifest that maps source paths, output paths, schema versions, material IDs,
+and source checksums. Hand-authored resources under `assets/vector/` and
+`assets/materials/` remain useful baselines, but generated resources should come
+from the approved source specifications.
+
 ## Asset IDs and file names
 
 Use lowercase snake case for every asset ID and file stem:
@@ -208,3 +216,36 @@ The validator exits non-zero for malformed metadata, duplicate asset IDs,
 degenerate polygons, self-intersections, unsupported categories, oversized
 bounds, off-center primary polygons, invalid ship orientation, asymmetric assets
 that require symmetry, and non-convex collision polygons.
+
+## Generating Godot resources
+
+Build all approved assets into Godot `.tres` resources:
+
+```sh
+python3 tools/asset_pipeline/build_assets.py
+```
+
+Verify the generated resources are current without writing files:
+
+```sh
+python3 tools/asset_pipeline/build_assets.py --check
+```
+
+Confirm the generated resources load in Godot:
+
+```sh
+/home/japurane/.local/bin/godot --headless --path . --script tools/asset_pipeline/check_generated_assets.gd
+```
+
+The builder validates every source asset before writing any output. It only
+reads `art/approved/` by default; pass `--source-dir` with
+`--allow-unapproved` when intentionally testing staging input. Generated vector
+resources are written to category directories under `assets/generated/`, while
+generated material definitions are written to `assets/generated/materials/`.
+The manifest at `assets/generated/manifest.json` is deterministic and contains
+no timestamps.
+
+The builder creates or updates only files declared by the current build. It does
+not delete unknown files automatically. In `--check` mode, it reports missing or
+stale generated files and also flags files still listed by an older manifest
+when those files are no longer part of the current generated set.

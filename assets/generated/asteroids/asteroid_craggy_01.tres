@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="VectorAssetDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_definition.gd" id="1_vector_definition"]
+[ext_resource type="Resource" path="res://assets/generated/materials/asteroid_faceted_craggy.tres" id="2_asteroid_faceted_craggy"]
+
+[resource]
+script = ExtResource("1_vector_definition")
+asset_id = &"asteroid_craggy_01"
+category = 1
+primary_polygon = PackedVector2Array(-44, -18, -24, -42, 10, -48, 38, -28, 50, 6, 26, 38, -12, 46, -46, 22)
+fill_color = Color(0.5, 0.52, 0.58, 1)
+material_definition = ExtResource("2_asteroid_faceted_craggy")
+collision_radius = 50
+tags = PackedStringArray("craggy", "rock", "variant")
+provenance_reference = "art/approved/asteroid_craggy_01.json"

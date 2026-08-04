@@ -36,7 +36,14 @@ class VectorAssetValidationTests(unittest.TestCase):
 
         self.assertEqual(
             {result.asset_id for result in results},
-            {"asteroid_baseline_01", "bullet_baseline_01", "ship_baseline_01"},
+            {
+                "asteroid_baseline_01",
+                "asteroid_craggy_01",
+                "asteroid_ice_01",
+                "asteroid_iron_01",
+                "bullet_baseline_01",
+                "ship_baseline_01",
+            },
         )
 
     def test_self_intersecting_polygon_fails(self) -> None:
@@ -91,7 +98,14 @@ class VectorAssetValidationTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(
                 sorted(path.name for path in Path(temp_dir).glob("*.json")),
-                ["asteroid_baseline_01.json", "bullet_baseline_01.json", "ship_baseline_01.json"],
+                [
+                    "asteroid_baseline_01.json",
+                    "asteroid_craggy_01.json",
+                    "asteroid_ice_01.json",
+                    "asteroid_iron_01.json",
+                    "bullet_baseline_01.json",
+                    "ship_baseline_01.json",
+                ],
             )
 
 
