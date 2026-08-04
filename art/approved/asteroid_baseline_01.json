@@ -4,6 +4,19 @@
   "category": "asteroid",
   "primary_polygon": [[-36, -24], [-10, -42], [28, -34], [44, -4], [30, 34], [-8, 42], [-42, 16]],
   "fill_color": [0.58, 0.6, 0.66, 1.0],
+  "material": {
+    "material_id": "asteroid_faceted_baseline",
+    "shader_mode": "asteroid_faceted",
+    "base_tint": [1.0, 1.0, 1.0, 1.0],
+    "ambient": 0.36,
+    "diffuse_strength": 0.68,
+    "light_band_count": 4,
+    "highlight_strength": 0.06,
+    "noise_seed": 1729,
+    "noise_scale": 0.045,
+    "noise_strength": 0.14,
+    "facet_strength": 0.58
+  },
   "collision": {
     "type": "circle",
     "radius": 44

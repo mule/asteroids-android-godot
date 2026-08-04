@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="AssetMaterialDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/asset_material_definition.gd" id="1_lju64"]
+[ext_resource type="Shader" path="res://assets/shaders/emissive_unlit.gdshader" id="2_gjqph"]
+
+[resource]
+script = ExtResource("1_lju64")
+material_id = &"bullet_emissive_baseline"
+shader_mode = 3
+shader = ExtResource("2_gjqph")
+base_tint = Color(1, 1, 1, 1)
+emission_color = Color(1, 0.82, 0.16, 1)
+emission_intensity = 0.45

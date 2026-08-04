@@ -1,9 +1,12 @@
 extends Area2D
 
 
+const MATERIAL_RUNTIME := preload("res://scripts/material_runtime.gd")
+
 signal shoot_requested(muzzle_position: Vector2, direction: Vector2, inherited_velocity: Vector2)
 
 @export var visual_asset: Resource = preload("res://assets/vector/baseline_ship.tres")
+@export var shader_lighting_enabled: bool = true
 @export var acceleration: float = 360.0
 @export var max_speed: float = 520.0
 @export var turn_speed_degrees: float = 180.0
@@ -22,10 +25,14 @@ var velocity: Vector2 = Vector2.ZERO
 var fire_cooldown_remaining: float = 0.0
 var controls_enabled: bool = true
 var invulnerable: bool = false
+var world_light_direction: Vector2 = Vector2(-0.55, -0.83).normalized()
+var ship_material: ShaderMaterial
+var thrust_material: ShaderMaterial
 
 
 func _ready() -> void:
 	_apply_visual_asset()
+	_update_shader_light_direction()
 
 
 func _physics_process(delta: float) -> void:
@@ -39,6 +46,7 @@ func _physics_process(delta: float) -> void:
 	_apply_drift(delta)
 	_move(delta)
 	_wrap_to_visible_viewport()
+	_update_shader_light_direction()
 
 
 func _apply_rotation_input(delta: float) -> void:
@@ -134,6 +142,17 @@ func set_invulnerable(value: bool) -> void:
 	modulate = Color(1.0, 1.0, 1.0, 0.45) if value else Color.WHITE
 
 
+func set_shader_lighting_enabled(value: bool) -> void:
+	shader_lighting_enabled = value
+	MATERIAL_RUNTIME.set_lighting_enabled(ship_material, value)
+	MATERIAL_RUNTIME.set_lighting_enabled(thrust_material, value)
+
+
+func set_world_light_direction(value: Vector2) -> void:
+	world_light_direction = value.normalized()
+	_update_shader_light_direction()
+
+
 func _apply_visual_asset() -> void:
 	if (
 		visual_asset == null
@@ -144,14 +163,26 @@ func _apply_visual_asset() -> void:
 
 	ship_shape.polygon = visual_asset.primary_polygon
 	ship_shape.color = visual_asset.fill_color
+	ship_material = MATERIAL_RUNTIME.apply_material_definition(ship_shape, visual_asset.material_definition)
 
 	var flame_asset: Resource = visual_asset.get_secondary_polygon(&"thrust_flame")
 	if flame_asset != null and flame_asset.is_valid():
 		thrust_flame.polygon = flame_asset.polygon
 		thrust_flame.color = flame_asset.fill_color
+		thrust_material = MATERIAL_RUNTIME.apply_material_definition(
+			thrust_flame,
+			flame_asset.get("material_definition")
+		)
 		thrust_flame.visible = flame_asset.visible_by_default
 
 	if visual_asset.use_collision_polygon and visual_asset.collision_polygon.size() >= 3:
 		var ship_collision := ConvexPolygonShape2D.new()
 		ship_collision.points = visual_asset.collision_polygon
 		collision_shape.shape = ship_collision
+
+	set_shader_lighting_enabled(shader_lighting_enabled)
+	_update_shader_light_direction()
+
+
+func _update_shader_light_direction() -> void:
+	MATERIAL_RUNTIME.set_world_light_direction(ship_material, self, world_light_direction)

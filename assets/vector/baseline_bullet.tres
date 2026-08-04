@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="VectorAssetDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="VectorAssetDefinition" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/resources/vector_asset_definition.gd" id="1_7kxfr"]
+[ext_resource type="Resource" path="res://assets/materials/baseline_bullet_emissive.tres" id="2_8c1ru"]
 
 [resource]
 script = ExtResource("1_7kxfr")
@@ -8,6 +9,7 @@ asset_id = &"bullet_baseline_01"
 category = 2
 primary_polygon = PackedVector2Array(0, -8, 6, 0, 0, 8, -6, 0)
 fill_color = Color(1, 0.95, 0.42, 1)
+material_definition = ExtResource("2_8c1ru")
 collision_radius = 5.0
 tags = PackedStringArray("baseline", "projectile")
 provenance_reference = "scenes/entities/Bullet.tscn before issue #24"

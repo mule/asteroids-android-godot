@@ -1,6 +1,8 @@
 extends Area2D
 
 
+const MATERIAL_RUNTIME := preload("res://scripts/material_runtime.gd")
+
 signal destroyed(asteroid: Area2D, size_tier: int, hit_position: Vector2, incoming_velocity: Vector2)
 
 enum AsteroidSize {
@@ -10,6 +12,7 @@ enum AsteroidSize {
 }
 
 @export var visual_asset: Resource = preload("res://assets/vector/baseline_asteroid.tres")
+@export var shader_lighting_enabled: bool = true
 @export_enum("Large", "Medium", "Small") var size_tier: int = AsteroidSize.LARGE
 @export var drift_speed: float = 90.0
 @export var rotation_speed_degrees: float = 25.0
@@ -19,17 +22,21 @@ enum AsteroidSize {
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 
 var velocity: Vector2 = Vector2.ZERO
+var world_light_direction: Vector2 = Vector2(-0.55, -0.83).normalized()
+var rock_material: ShaderMaterial
 
 
 func _ready() -> void:
 	_apply_visual_asset()
 	_apply_size_tier()
+	_update_shader_light_direction()
 
 
 func _physics_process(delta: float) -> void:
 	position += velocity * delta
 	rotation += deg_to_rad(rotation_speed_degrees) * delta
 	_wrap_to_visible_viewport()
+	_update_shader_light_direction()
 
 
 func setup(tier: int, initial_velocity: Vector2) -> void:
@@ -53,6 +60,16 @@ func handle_bullet_hit(bullet: Area2D) -> void:
 	queue_free()
 
 
+func set_shader_lighting_enabled(value: bool) -> void:
+	shader_lighting_enabled = value
+	MATERIAL_RUNTIME.set_lighting_enabled(rock_material, value)
+
+
+func set_world_light_direction(value: Vector2) -> void:
+	world_light_direction = value.normalized()
+	_update_shader_light_direction()
+
+
 func _apply_size_tier() -> void:
 	rock_shape.scale = Vector2.ONE * _get_visual_scale()
 
@@ -72,6 +89,9 @@ func _apply_visual_asset() -> void:
 
 	rock_shape.polygon = visual_asset.primary_polygon
 	rock_shape.color = visual_asset.fill_color
+	rock_material = MATERIAL_RUNTIME.apply_material_definition(rock_shape, visual_asset.material_definition)
+	set_shader_lighting_enabled(shader_lighting_enabled)
+	_update_shader_light_direction()
 
 
 func _get_visual_scale() -> float:
@@ -108,3 +128,7 @@ func _wrap_to_visible_viewport() -> void:
 		position.y = max_position.y
 	elif position.y > max_position.y:
 		position.y = min_position.y
+
+
+func _update_shader_light_direction() -> void:
+	MATERIAL_RUNTIME.set_world_light_direction(rock_material, self, world_light_direction)

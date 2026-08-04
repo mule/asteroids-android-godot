@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="AssetMaterialDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/asset_material_definition.gd" id="1_b7m2j"]
+[ext_resource type="Shader" path="res://assets/shaders/emissive_unlit.gdshader" id="2_akdde"]
+
+[resource]
+script = ExtResource("1_b7m2j")
+material_id = &"thrust_emissive_baseline"
+shader_mode = 3
+shader = ExtResource("2_akdde")
+base_tint = Color(1, 1, 1, 1)
+emission_color = Color(1, 0.36, 0.08, 1)
+emission_intensity = 0.55
