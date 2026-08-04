@@ -1,0 +1,40 @@
+{
+  "schema_version": "vector-asset/v1",
+  "asset_id": "asteroid_slate_01",
+  "category": "asteroid",
+  "primary_polygon": [[-50, -8], [-30, -36], [0, -50], [34, -34], [52, -2], [34, 34], [2, 48], [-34, 32]],
+  "fill_color": [0.4, 0.46, 0.54, 1.0],
+  "material": {
+    "material_id": "asteroid_faceted_slate",
+    "shader_mode": "asteroid_faceted",
+    "base_tint": [0.9, 0.96, 1.0, 1.0],
+    "ambient": 0.36,
+    "diffuse_strength": 0.64,
+    "light_band_count": 3,
+    "highlight_strength": 0.08,
+    "noise_seed": 5419,
+    "noise_scale": 0.044,
+    "noise_strength": 0.15,
+    "facet_strength": 0.48
+  },
+  "collision": {
+    "type": "circle",
+    "radius": 52
+  },
+  "tags": ["candidate", "rock", "slate"],
+  "provenance": {
+    "generator": "codex",
+    "model": "gpt-5-codex",
+    "prompt_file": "art/prompts/asteroid-silhouette.md",
+    "prompt_revision": "issue-29",
+    "created_at": "2026-08-04",
+    "seed": "manual-slate-01",
+    "manual_edits": "Hand-normalized from the issue 29 prompt workflow example.",
+    "source_license": "project-owned",
+    "notes": "Deferred candidate; valid but visually close to existing cool asteroids."
+  },
+  "approval": {
+    "status": "rejected",
+    "reviewer": "japurane"
+  }
+}

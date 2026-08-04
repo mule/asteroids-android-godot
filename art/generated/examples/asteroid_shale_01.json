@@ -1,0 +1,40 @@
+{
+  "schema_version": "vector-asset/v1",
+  "asset_id": "asteroid_shale_01",
+  "category": "asteroid",
+  "primary_polygon": [[-48, -12], [-34, -38], [-4, -48], [30, -36], [48, -10], [38, 26], [8, 48], [-30, 34], [-52, 8]],
+  "fill_color": [0.48, 0.52, 0.56, 1.0],
+  "material": {
+    "material_id": "asteroid_faceted_shale",
+    "shader_mode": "asteroid_faceted",
+    "base_tint": [0.94, 0.98, 1.0, 1.0],
+    "ambient": 0.34,
+    "diffuse_strength": 0.72,
+    "light_band_count": 4,
+    "highlight_strength": 0.07,
+    "noise_seed": 9182,
+    "noise_scale": 0.048,
+    "noise_strength": 0.18,
+    "facet_strength": 0.64
+  },
+  "collision": {
+    "type": "circle",
+    "radius": 52
+  },
+  "tags": ["candidate", "rock", "shale"],
+  "provenance": {
+    "generator": "codex",
+    "model": "gpt-5-codex",
+    "prompt_file": "art/prompts/asteroid-silhouette.md",
+    "prompt_revision": "issue-29",
+    "created_at": "2026-08-04",
+    "seed": "manual-shale-01",
+    "manual_edits": "Hand-normalized from the issue 29 prompt workflow example.",
+    "source_license": "project-owned",
+    "notes": "Layered shale-like asteroid candidate with broad readable facets."
+  },
+  "approval": {
+    "status": "draft",
+    "reviewer": "unreviewed"
+  }
+}

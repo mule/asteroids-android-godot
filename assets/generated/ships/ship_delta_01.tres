@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="VectorAssetDefinition" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_definition.gd" id="1_vector_definition"]
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_polygon.gd" id="2_vector_polygon"]
+[ext_resource type="Resource" path="res://assets/generated/materials/ship_lit_delta.tres" id="3_ship_lit_delta"]
+[ext_resource type="Resource" path="res://assets/generated/materials/thrust_emissive_delta.tres" id="4_thrust_emissive_delta"]
+
+[sub_resource type="Resource" id="Resource_thrust_flame"]
+script = ExtResource("2_vector_polygon")
+polygon_id = &"thrust_flame"
+polygon = PackedVector2Array(10, 26, 4, 54, 0, 38, -4, 54, -10, 26)
+fill_color = Color(1, 0.48, 0.16, 0.9)
+material_definition = ExtResource("4_thrust_emissive_delta")
+visible_by_default = false
+
+[resource]
+script = ExtResource("1_vector_definition")
+asset_id = &"ship_delta_01"
+category = 0
+primary_polygon = PackedVector2Array(0, -32, 14, 12, 24, 28, 8, 20, 0, 14, -8, 20, -24, 28, -14, 12)
+fill_color = Color(0.78, 0.92, 1, 1)
+material_definition = ExtResource("3_ship_lit_delta")
+secondary_polygons = Array[Resource]([SubResource("Resource_thrust_flame")])
+use_collision_polygon = true
+collision_polygon = PackedVector2Array(0, -32, 24, 28, -24, 28)
+tags = PackedStringArray("candidate", "delta", "player")
+provenance_reference = "art/approved/ship_delta_01.json"

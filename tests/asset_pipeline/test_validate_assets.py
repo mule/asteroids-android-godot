@@ -39,10 +39,13 @@ class VectorAssetValidationTests(unittest.TestCase):
             {
                 "asteroid_baseline_01",
                 "asteroid_craggy_01",
+                "asteroid_cobalt_01",
                 "asteroid_ice_01",
                 "asteroid_iron_01",
+                "asteroid_shale_01",
                 "bullet_baseline_01",
                 "ship_baseline_01",
+                "ship_delta_01",
             },
         )
 
@@ -100,11 +103,14 @@ class VectorAssetValidationTests(unittest.TestCase):
                 sorted(path.name for path in Path(temp_dir).glob("*.json")),
                 [
                     "asteroid_baseline_01.json",
+                    "asteroid_cobalt_01.json",
                     "asteroid_craggy_01.json",
                     "asteroid_ice_01.json",
                     "asteroid_iron_01.json",
+                    "asteroid_shale_01.json",
                     "bullet_baseline_01.json",
                     "ship_baseline_01.json",
+                    "ship_delta_01.json",
                 ],
             )
 

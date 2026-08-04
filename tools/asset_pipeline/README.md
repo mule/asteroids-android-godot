@@ -13,7 +13,7 @@ deterministic normalization. It has no dependency on the Godot editor.
 Run the automated tests with:
 
 ```sh
-python3 -m unittest tests.asset_pipeline.test_validate_assets tests.asset_pipeline.test_build_assets
+python3 -m unittest tests.asset_pipeline.test_validate_assets tests.asset_pipeline.test_build_assets tests.asset_pipeline.test_promote_asset
 ```
 
 ## Build generated Godot resources
@@ -49,10 +49,33 @@ The builder only reads approved specs by default. To build from a staging
 directory, pass both `--source-dir` and `--allow-unapproved` so the nonproduction
 input is explicit.
 
+## Promote one reviewed candidate
+
+```sh
+python3 tools/asset_pipeline/promote_asset.py art/generated/examples/ship_delta_01.json --asset-id ship_delta_01 --reviewer japurane
+```
+
+Promotion validates one explicit candidate file, normalizes it, sets approval
+metadata, writes it to `art/approved/`, and refuses to overwrite an existing
+approved file unless `--allow-overwrite` is passed.
+
+Build temporary candidate-review resources without touching production generated
+assets:
+
+```sh
+python3 tools/asset_pipeline/build_assets.py --source-dir art/generated/examples --output-dir art/generated/review_assets --allow-unapproved
+```
+
 ## Review generated assets
 
 ```sh
 /home/japurane/.local/bin/godot --path . scenes/tools/AssetGallery.tscn
+```
+
+Review a temporary candidate manifest:
+
+```sh
+/home/japurane/.local/bin/godot --path . scenes/tools/AssetGallery.tscn -- --manifest=res://art/generated/review_assets/manifest.json
 ```
 
 The gallery loads `assets/generated/manifest.json`, groups generated vector

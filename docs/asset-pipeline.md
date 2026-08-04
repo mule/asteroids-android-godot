@@ -140,6 +140,52 @@ Rejected output should usually stay untracked. Use `art/rejected/` for short
 notes or small review fixtures only when they help future contributors avoid
 the same failed direction.
 
+## Repeatable Prompt Workflow
+
+Provider-neutral prompts live under `art/prompts/`. The baseline workflow does
+not require a provider SDK or API key:
+
+1. Read the relevant prompt, `art/schemas/vector-asset.schema.json`,
+   [the art style guide](art-style-guide.md), and this contract.
+2. Ask Codex or another model to return JSON-only candidate assets.
+3. Save small reviewable candidates under `art/generated/examples/`, or keep
+   bulk/local provider output untracked.
+4. Validate candidates:
+
+   ```sh
+   python3 tools/asset_pipeline/validate_assets.py art/generated/examples
+   ```
+
+5. Build temporary review resources from the candidates:
+
+   ```sh
+   python3 tools/asset_pipeline/build_assets.py --source-dir art/generated/examples --output-dir art/generated/review_assets --allow-unapproved
+   ```
+
+6. Review candidates in the gallery with the temporary manifest:
+
+   ```sh
+   /home/japurane/.local/bin/godot --path . scenes/tools/AssetGallery.tscn -- --manifest=res://art/generated/review_assets/manifest.json
+   ```
+
+7. Record the decision in `art/experiments/`.
+8. Promote one selected candidate explicitly:
+
+   ```sh
+   python3 tools/asset_pipeline/promote_asset.py art/generated/examples/ship_delta_01.json --asset-id ship_delta_01 --reviewer japurane
+   ```
+
+9. Rebuild production generated Godot resources:
+
+   ```sh
+   python3 tools/asset_pipeline/build_assets.py
+   ```
+
+Prompt revisions and model details belong in each candidate's `provenance`
+object and in the experiment record. Record source/provider terms and ownership
+notes, but do not make unsupported legal claims. If terms are unclear, keep the
+candidate out of `art/approved/`.
+
 ## Verification
 
 Documentation-only changes should be verified by checking paths, links, and a
@@ -258,11 +304,18 @@ Launch the asset gallery scene without changing the committed main scene:
 /home/japurane/.local/bin/godot --path . scenes/tools/AssetGallery.tscn
 ```
 
-The gallery reads `assets/generated/manifest.json`, groups generated vector
-assets by category, and shows canonical, rotating, gameplay-scale, and
-phone-scale previews. Use the toolbar to switch categories, pause rotation, and
-toggle collision or bounds overlays. Broken or missing generated resources are
-reported in the detail panel instead of crashing the gallery.
+Launch it against a temporary candidate-review manifest:
+
+```sh
+/home/japurane/.local/bin/godot --path . scenes/tools/AssetGallery.tscn -- --manifest=res://art/generated/review_assets/manifest.json
+```
+
+The gallery reads `assets/generated/manifest.json` by default, or a manifest
+provided with `--manifest=...`, groups generated vector assets by category, and
+shows canonical, rotating, gameplay-scale, and phone-scale previews. Use the
+toolbar to switch categories, pause rotation, and toggle collision or bounds
+overlays. Broken or missing generated resources are reported in the detail
+panel instead of crashing the gallery.
 
 Smoke-test the gallery without opening a desktop window:
 
