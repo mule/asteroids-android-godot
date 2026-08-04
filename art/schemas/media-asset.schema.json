@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Asteroids media asset source",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "asset_id",
+    "kind",
+    "role",
+    "output_path",
+    "provenance",
+    "approval"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "media-asset/v1"
+    },
+    "asset_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(_[a-z0-9]+)*_[0-9]{2}$"
+    },
+    "kind": {
+      "enum": ["raster", "effect", "audio"]
+    },
+    "role": {
+      "enum": ["background", "impact_effect", "shot_sfx", "impact_sfx"]
+    },
+    "output_path": {
+      "type": "string"
+    },
+    "raster": {
+      "type": "object",
+      "required": ["format", "width", "height", "requires_alpha", "max_bytes", "recipe"],
+      "properties": {
+        "format": {
+          "const": "png_rgba8"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2048
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2048
+        },
+        "requires_alpha": {
+          "type": "boolean"
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "recipe": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "audio": {
+      "type": "object",
+      "required": [
+        "format",
+        "sample_rate",
+        "channels",
+        "max_duration_seconds",
+        "max_peak",
+        "loop",
+        "recipe"
+      ],
+      "properties": {
+        "format": {
+          "const": "wav_pcm16"
+        },
+        "sample_rate": {
+          "type": "integer",
+          "minimum": 8000,
+          "maximum": 48000
+        },
+        "channels": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2
+        },
+        "max_duration_seconds": {
+          "type": "number",
+          "minimum": 0.02,
+          "maximum": 2.0
+        },
+        "max_peak": {
+          "type": "number",
+          "minimum": 0.05,
+          "maximum": 1.0
+        },
+        "loop": {
+          "type": "boolean"
+        },
+        "recipe": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "generator",
+        "model",
+        "prompt_file",
+        "prompt_revision",
+        "created_at",
+        "seed",
+        "manual_edits",
+        "source_license",
+        "notes"
+      ]
+    },
+    "approval": {
+      "type": "object",
+      "required": ["status", "reviewer"],
+      "properties": {
+        "status": {
+          "enum": ["draft", "approved", "rejected"]
+        },
+        "reviewer": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "required": ["raster"],
+      "not": {
+        "required": ["audio"]
+      }
+    },
+    {
+      "required": ["audio"],
+      "not": {
+        "required": ["raster"]
+      }
+    }
+  ],
+  "additionalProperties": false
+}

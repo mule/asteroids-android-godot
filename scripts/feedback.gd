@@ -3,6 +3,11 @@ extends Node
 
 @export var spark_lifetime: float = 0.28
 @export var respawn_lifetime: float = 0.45
+@export var impact_flash_lifetime: float = 0.18
+@export var sfx_volume_db: float = -12.0
+@export var muzzle_sound: AudioStream
+@export var asteroid_impact_sound: AudioStream
+@export var impact_flash_texture: Texture2D
 
 @onready var effects_root: Node2D = $"../Effects"
 @onready var flash_rect: ColorRect = $"../ScreenEffects/Flash"
@@ -10,12 +15,15 @@ extends Node
 
 func spawn_muzzle_flash(spawn_position: Vector2, direction: Vector2) -> void:
 	_spawn_sparks(spawn_position, direction.angle(), 3, Color(1.0, 0.92, 0.35, 1.0), 18.0)
+	_play_sound(muzzle_sound)
 
 
 func spawn_asteroid_burst(spawn_position: Vector2, size_tier: int) -> void:
 	var spark_count: int = 10 - mini(size_tier * 2, 4)
 	var spark_length: float = 34.0 - float(size_tier) * 7.0
 	_spawn_sparks(spawn_position, 0.0, spark_count, Color(0.95, 0.78, 0.48, 1.0), spark_length)
+	_spawn_impact_flash(spawn_position, size_tier)
+	_play_sound(asteroid_impact_sound)
 
 
 func spawn_player_hit(spawn_position: Vector2) -> void:
@@ -78,6 +86,38 @@ func _spawn_sparks(
 		tween.tween_property(spark, "modulate:a", 0.0, spark_lifetime)
 		tween.set_parallel(false)
 		tween.tween_callback(spark.queue_free)
+
+
+func _spawn_impact_flash(spawn_position: Vector2, size_tier: int) -> void:
+	if impact_flash_texture == null:
+		return
+
+	var flash := Sprite2D.new()
+	flash.texture = impact_flash_texture
+	flash.centered = true
+	flash.position = spawn_position
+	flash.modulate = Color(1.0, 1.0, 1.0, 0.82)
+	flash.scale = Vector2.ONE * (0.42 + float(size_tier) * 0.18)
+	effects_root.add_child(flash)
+
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(flash, "scale", flash.scale * 1.85, impact_flash_lifetime)
+	tween.tween_property(flash, "modulate:a", 0.0, impact_flash_lifetime)
+	tween.set_parallel(false)
+	tween.tween_callback(flash.queue_free)
+
+
+func _play_sound(stream: AudioStream) -> void:
+	if stream == null:
+		return
+
+	var player := AudioStreamPlayer.new()
+	player.stream = stream
+	player.volume_db = sfx_volume_db
+	add_child(player)
+	player.finished.connect(player.queue_free)
+	player.play()
 
 
 func _flash(color: Color, duration: float) -> void:

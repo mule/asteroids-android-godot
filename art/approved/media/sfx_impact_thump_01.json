@@ -1,0 +1,35 @@
+{
+  "schema_version": "media-asset/v1",
+  "asset_id": "sfx_impact_thump_01",
+  "kind": "audio",
+  "role": "impact_sfx",
+  "output_path": "assets/audio/sfx_impact_thump_01.wav",
+  "audio": {
+    "format": "wav_pcm16",
+    "sample_rate": 44100,
+    "channels": 1,
+    "max_duration_seconds": 0.42,
+    "max_peak": 0.9,
+    "loop": false,
+    "recipe": {
+      "type": "impact_thump",
+      "seed": 3004,
+      "duration_seconds": 0.32
+    }
+  },
+  "provenance": {
+    "generator": "tools/asset_pipeline/build_media_assets.py",
+    "model": "procedural",
+    "prompt_file": "art/prompts/audio-sfx-assets.md",
+    "prompt_revision": "issue-30",
+    "created_at": "2026-08-04",
+    "seed": 3004,
+    "manual_edits": "Used mono low-frequency transient with a fast decay for small phone speakers.",
+    "source_license": "project-owned procedural output",
+    "notes": "Approved as the first asteroid impact sound effect."
+  },
+  "approval": {
+    "status": "approved",
+    "reviewer": "japurane"
+  }
+}

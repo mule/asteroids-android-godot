@@ -1,0 +1,35 @@
+{
+  "schema_version": "media-asset/v1",
+  "asset_id": "background_starfield_01",
+  "kind": "raster",
+  "role": "background",
+  "output_path": "assets/media/backgrounds/background_starfield_01.png",
+  "raster": {
+    "format": "png_rgba8",
+    "width": 1152,
+    "height": 648,
+    "requires_alpha": false,
+    "max_bytes": 350000,
+    "recipe": {
+      "type": "starfield_nebula",
+      "seed": 3001,
+      "star_count": 190,
+      "nebula_color": [38, 84, 138]
+    }
+  },
+  "provenance": {
+    "generator": "tools/asset_pipeline/build_media_assets.py",
+    "model": "procedural",
+    "prompt_file": "art/prompts/raster-presentation-assets.md",
+    "prompt_revision": "issue-30",
+    "created_at": "2026-08-04",
+    "seed": 3001,
+    "manual_edits": "Kept contrast low and star density sparse so asteroids remain readable over the background.",
+    "source_license": "project-owned procedural output",
+    "notes": "Approved as the first raster presentation asset slice."
+  },
+  "approval": {
+    "status": "approved",
+    "reviewer": "japurane"
+  }
+}

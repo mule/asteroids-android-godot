@@ -117,12 +117,26 @@ def collect_json_files(paths: Sequence[Path]) -> list[Path]:
     files: list[Path] = []
     for path in paths:
         if path.is_dir():
-            files.extend(sorted(child for child in path.rglob("*.json") if child.is_file()))
+            files.extend(
+                sorted(
+                    child
+                    for child in path.rglob("*.json")
+                    if child.is_file() and _is_vector_asset_file(child)
+                )
+            )
         elif path.is_file():
             files.append(path)
         else:
             raise ValidationError(str(path), "path does not exist")
     return sorted(dict.fromkeys(files))
+
+
+def _is_vector_asset_file(path: Path) -> bool:
+    try:
+        data = load_json(path)
+    except ValidationError:
+        return True
+    return isinstance(data, dict) and data.get("schema_version") == SCHEMA_VERSION
 
 
 def validate_paths(paths: Sequence[Path]) -> list[ValidationResult]:

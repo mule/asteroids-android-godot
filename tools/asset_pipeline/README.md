@@ -13,7 +13,7 @@ deterministic normalization. It has no dependency on the Godot editor.
 Run the automated tests with:
 
 ```sh
-python3 -m unittest tests.asset_pipeline.test_validate_assets tests.asset_pipeline.test_build_assets tests.asset_pipeline.test_promote_asset
+python3 -m unittest tests.asset_pipeline.test_validate_assets tests.asset_pipeline.test_build_assets tests.asset_pipeline.test_promote_asset tests.asset_pipeline.test_media_assets
 ```
 
 ## Build generated Godot resources
@@ -104,3 +104,16 @@ Capture an ignored local contact sheet:
 The runtime smoke check verifies that the same seed produces the same asteroid
 spawn and visual sequence, that the initial wave contains multiple generated
 asteroid visuals, and that split children retain the expected size tier.
+
+## Build and validate media assets
+
+```sh
+python3 tools/asset_pipeline/build_media_assets.py
+python3 tools/asset_pipeline/validate_media_assets.py art/approved/media
+python3 tools/asset_pipeline/build_media_assets.py --check
+```
+
+Media specs under `art/approved/media/` use `media-asset/v1`. The builder
+creates deterministic PNG/WAV outputs under `assets/media/` and `assets/audio/`;
+the validator checks dimensions, alpha requirements, file-size limits, WAV
+sample rate, channel count, duration, and normalized peak level.

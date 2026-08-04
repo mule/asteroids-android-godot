@@ -20,3 +20,7 @@ the AI-assisted asset pipeline described in:
 Approved source specifications are authoritative. Raw model payloads and local
 provider caches are not production assets.
 
+Raster, effect, and audio media specs live under `approved/media/` and use the
+separate `media-asset/v1` contract. Build them with
+`python3 tools/asset_pipeline/build_media_assets.py` before validating with
+`python3 tools/asset_pipeline/validate_media_assets.py art/approved/media`.

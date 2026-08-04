@@ -1,0 +1,36 @@
+{
+  "schema_version": "media-asset/v1",
+  "asset_id": "effect_impact_flash_01",
+  "kind": "effect",
+  "role": "impact_effect",
+  "output_path": "assets/media/effects/effect_impact_flash_01.png",
+  "raster": {
+    "format": "png_rgba8",
+    "width": 128,
+    "height": 128,
+    "requires_alpha": true,
+    "max_bytes": 50000,
+    "recipe": {
+      "type": "impact_flash",
+      "seed": 3002,
+      "inner_radius": 0.14,
+      "outer_radius": 0.54,
+      "color": [255, 202, 92]
+    }
+  },
+  "provenance": {
+    "generator": "tools/asset_pipeline/build_media_assets.py",
+    "model": "procedural",
+    "prompt_file": "art/prompts/visual-effect-assets.md",
+    "prompt_revision": "issue-30",
+    "created_at": "2026-08-04",
+    "seed": 3002,
+    "manual_edits": "Constrained to a small alpha sprite and layered behind procedural sparks.",
+    "source_license": "project-owned procedural output",
+    "notes": "Approved as the first raster effect asset for asteroid impacts."
+  },
+  "approval": {
+    "status": "approved",
+    "reviewer": "japurane"
+  }
+}

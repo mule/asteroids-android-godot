@@ -1,0 +1,35 @@
+{
+  "schema_version": "media-asset/v1",
+  "asset_id": "sfx_shot_spark_01",
+  "kind": "audio",
+  "role": "shot_sfx",
+  "output_path": "assets/audio/sfx_shot_spark_01.wav",
+  "audio": {
+    "format": "wav_pcm16",
+    "sample_rate": 44100,
+    "channels": 1,
+    "max_duration_seconds": 0.22,
+    "max_peak": 0.82,
+    "loop": false,
+    "recipe": {
+      "type": "shot_chirp",
+      "seed": 3003,
+      "duration_seconds": 0.16
+    }
+  },
+  "provenance": {
+    "generator": "tools/asset_pipeline/build_media_assets.py",
+    "model": "procedural",
+    "prompt_file": "art/prompts/audio-sfx-assets.md",
+    "prompt_revision": "issue-30",
+    "created_at": "2026-08-04",
+    "seed": 3003,
+    "manual_edits": "Shortened envelope to avoid overlapping heavily during rapid fire.",
+    "source_license": "project-owned procedural output",
+    "notes": "Approved as the first shot sound effect."
+  },
+  "approval": {
+    "status": "approved",
+    "reviewer": "japurane"
+  }
+}

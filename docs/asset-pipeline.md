@@ -64,6 +64,8 @@ issue explicitly asks for them.
   prompts do not override approved source specifications.
 - Generated `.tres` files may be committed later when predictable Godot imports
   are useful for review or Android builds.
+- Generated PNG/WAV media outputs may be committed when they are built from an
+  approved media specification and small enough for mobile review.
 - Raw model response payloads, provider caches, and unreviewed generated files
   are not production assets.
 
@@ -83,6 +85,14 @@ manifest that maps source paths, output paths, schema versions, material IDs,
 and source checksums. Hand-authored resources under `assets/vector/` and
 `assets/materials/` remain useful baselines, but generated resources should come
 from the approved source specifications.
+
+Runtime media outputs live under `assets/media/` for PNG presentation/effect
+textures and `assets/audio/` for short sound effects. Approved media source
+specifications live under `art/approved/media/` and use
+`media-asset/v1`, separate from the vector schema. The media contract records
+texture dimensions, alpha policy, file-size limits, audio format, sample rate,
+channel count, duration, peak level, loop policy, prompt/provenance, and manual
+cleanup notes.
 
 ## Asset IDs and file names
 
@@ -257,6 +267,32 @@ Write normalized JSON files into a staging directory:
 ```sh
 python3 tools/asset_pipeline/validate_assets.py art/approved --output-dir /tmp/asteroids-normalized-assets
 ```
+
+## Adding raster and audio media
+
+1. Add or update a provider-neutral prompt under `art/prompts/`.
+2. Save the reviewed media source specification under `art/approved/media/`.
+3. Keep raster and audio contracts separate from `vector-asset/v1`; media uses
+   `media-asset/v1` and [the media schema](../art/schemas/media-asset.schema.json).
+4. Build the runtime PNG/WAV outputs:
+
+   ```sh
+   python3 tools/asset_pipeline/build_media_assets.py
+   ```
+
+5. Validate the approved specs and generated outputs:
+
+   ```sh
+   python3 tools/asset_pipeline/validate_media_assets.py art/approved/media
+   python3 tools/asset_pipeline/build_media_assets.py --check
+   ```
+
+6. Integrate small assets through existing scene boundaries. Backgrounds should
+   stay behind gameplay entities, HUD icons should remain readable at mobile
+   scale, and short sound/effect assets should route through `Feedback` or
+   another presentation node rather than gameplay state.
+7. Verify desktop and Android startup after adding runtime media. Compare APK
+   size when adding large textures or longer audio.
 
 The validator exits non-zero for malformed metadata, duplicate asset IDs,
 degenerate polygons, self-intersections, unsupported categories, oversized
