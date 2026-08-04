@@ -3,7 +3,7 @@ extends Area2D
 
 const MATERIAL_RUNTIME := preload("res://scripts/material_runtime.gd")
 
-@export var visual_asset: Resource = preload("res://assets/vector/baseline_bullet.tres")
+@export var visual_asset: Resource = preload("res://assets/generated/bullets/bullet_baseline_01.tres")
 @export var shader_lighting_enabled: bool = true
 @export var speed: float = 760.0
 @export var lifetime_seconds: float = 1.2

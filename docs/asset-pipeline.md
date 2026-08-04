@@ -335,3 +335,22 @@ command for headless automation.
 For Android review, temporarily launch the same scene from the editor or a local
 export override, then discard the local scene-setting change before committing.
 The committed `project.godot` main scene must remain `res://scenes/game/Main.tscn`.
+
+## Runtime Variant Selection
+
+Gameplay uses approved generated vector resources without changing simulation
+rules. `Game.tscn` owns the asteroid visual pool and `scripts/game.gd` chooses
+one asteroid visual per spawn using the same seeded `RandomNumberGenerator`
+that already controls positions and velocities. Split children choose their own
+deterministic visuals from the same pool; scoring, speed ranges, child counts,
+and collision radius tiers remain unchanged.
+
+Entity scenes keep safe default visuals from `assets/generated/` so an empty or
+invalid asteroid pool falls back to a valid baseline. Runtime code treats shared
+`.tres` resources as immutable and only changes per-instance scene nodes.
+
+Check deterministic runtime variant selection:
+
+```sh
+/home/japurane/.local/bin/godot --headless --path . --script tools/asset_pipeline/check_runtime_variants.gd
+```

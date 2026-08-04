@@ -18,6 +18,8 @@ const ASTEROID_SMALL := 2
 @export var random_seed: int = 1729
 @export var world_light_direction: Vector2 = Vector2(-0.55, -0.83)
 @export var shader_lighting_enabled: bool = true
+@export var asteroid_visual_assets: Array[Resource] = []
+@export var auto_start: bool = true
 
 @onready var entities: Node2D = $Entities
 @onready var player_ship: Area2D = $Entities/PlayerShip
@@ -44,7 +46,8 @@ func _ready() -> void:
 	hud.restart_requested.connect(_start_new_game)
 	hud.touch_action_changed.connect(_on_hud_touch_action_changed)
 	_apply_lighting_to_entity(player_ship)
-	_start_new_game()
+	if auto_start:
+		_start_new_game()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -126,9 +129,11 @@ func _spawn_wave() -> void:
 
 func _spawn_asteroid(size_tier: int, spawn_position: Vector2, velocity: Vector2) -> Area2D:
 	var asteroid := asteroid_scene.instantiate() as Area2D
+	var visual_asset := _get_random_asteroid_visual_asset()
+	var initial_rotation := random.randf_range(0.0, TAU)
 
 	if asteroid.has_method("setup"):
-		asteroid.setup(size_tier, velocity)
+		asteroid.setup(size_tier, velocity, visual_asset, initial_rotation)
 
 	entities.add_child(asteroid)
 	asteroid.add_to_group("asteroids")
@@ -313,6 +318,51 @@ func _get_random_asteroid_velocity(size_tier: int) -> Vector2:
 	var angle := random.randf_range(0.0, TAU)
 	var speed := random.randf_range(_get_min_speed(size_tier), _get_max_speed(size_tier))
 	return Vector2.RIGHT.rotated(angle) * speed
+
+
+func _get_random_asteroid_visual_asset() -> Resource:
+	var valid_assets := _get_valid_asteroid_visual_assets()
+	if valid_assets.is_empty():
+		return null
+	return valid_assets[random.randi_range(0, valid_assets.size() - 1)]
+
+
+func _get_valid_asteroid_visual_assets() -> Array[Resource]:
+	var valid_assets: Array[Resource] = []
+	for asset: Resource in asteroid_visual_assets:
+		if (
+			asset != null
+			and asset.has_method("is_primary_polygon_valid")
+			and asset.is_primary_polygon_valid()
+		):
+			valid_assets.append(asset)
+	return valid_assets
+
+
+func get_active_asteroid_debug_snapshot() -> Array[Dictionary]:
+	var snapshot: Array[Dictionary] = []
+	for asteroid in get_tree().get_nodes_in_group("asteroids"):
+		if not is_instance_valid(asteroid) or asteroid.is_queued_for_deletion():
+			continue
+
+		var visual_asset_id := StringName()
+		if asteroid.has_method("get_visual_asset_id"):
+			visual_asset_id = asteroid.get_visual_asset_id()
+
+		snapshot.append({
+			"position": asteroid.global_position,
+			"velocity": asteroid.get("velocity"),
+			"size_tier": asteroid.get("size_tier"),
+			"visual_asset_id": visual_asset_id,
+			"rotation": asteroid.rotation,
+		})
+
+	snapshot.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if not is_equal_approx(a["position"].x, b["position"].x):
+			return a["position"].x < b["position"].x
+		return a["position"].y < b["position"].y
+	)
+	return snapshot
 
 
 func _get_split_velocity(size_tier: int, incoming_velocity: Vector2, index: int) -> Vector2:
