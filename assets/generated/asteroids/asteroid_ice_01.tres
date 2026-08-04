@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="VectorAssetDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_definition.gd" id="1_vector_definition"]
+[ext_resource type="Resource" path="res://assets/generated/materials/asteroid_faceted_ice.tres" id="2_asteroid_faceted_ice"]
+
+[resource]
+script = ExtResource("1_vector_definition")
+asset_id = &"asteroid_ice_01"
+category = 1
+primary_polygon = PackedVector2Array(-34, -34, 2, -50, 38, -30, 48, 4, 24, 42, -18, 44, -48, 10)
+fill_color = Color(0.62, 0.78, 0.9, 1)
+material_definition = ExtResource("2_asteroid_faceted_ice")
+collision_radius = 49
+tags = PackedStringArray("ice", "rock", "variant")
+provenance_reference = "art/approved/asteroid_ice_01.json"

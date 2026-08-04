@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="VectorAssetDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_definition.gd" id="1_vector_definition"]
+[ext_resource type="Resource" path="res://assets/generated/materials/asteroid_faceted_iron.tres" id="2_asteroid_faceted_iron"]
+
+[resource]
+script = ExtResource("1_vector_definition")
+asset_id = &"asteroid_iron_01"
+category = 1
+primary_polygon = PackedVector2Array(-40, -28, -6, -46, 30, -38, 48, -10, 42, 28, 8, 48, -30, 34, -50, 2)
+fill_color = Color(0.66, 0.54, 0.5, 1)
+material_definition = ExtResource("2_asteroid_faceted_iron")
+collision_radius = 50
+tags = PackedStringArray("iron", "rock", "variant")
+provenance_reference = "art/approved/asteroid_iron_01.json"

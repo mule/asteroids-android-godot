@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="VectorAssetDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_definition.gd" id="1_vector_definition"]
+[ext_resource type="Resource" path="res://assets/generated/materials/bullet_emissive_baseline.tres" id="2_bullet_emissive_baseline"]
+
+[resource]
+script = ExtResource("1_vector_definition")
+asset_id = &"bullet_baseline_01"
+category = 2
+primary_polygon = PackedVector2Array(0, -8, 6, 0, 0, 8, -6, 0)
+fill_color = Color(1, 0.95, 0.42, 1)
+material_definition = ExtResource("2_bullet_emissive_baseline")
+collision_radius = 5
+tags = PackedStringArray("baseline", "projectile")
+provenance_reference = "art/approved/bullet_baseline_01.json"
