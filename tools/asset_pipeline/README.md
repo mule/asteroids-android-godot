@@ -94,3 +94,13 @@ Capture an ignored local contact sheet:
 ```sh
 /home/japurane/.local/bin/godot --path . --script tools/asset_pipeline/capture_asset_gallery.gd -- --output=res://art/generated/asset_gallery_contact_sheet.png
 ```
+
+## Check runtime variants
+
+```sh
+/home/japurane/.local/bin/godot --headless --path . --script tools/asset_pipeline/check_runtime_variants.gd
+```
+
+The runtime smoke check verifies that the same seed produces the same asteroid
+spawn and visual sequence, that the initial wave contains multiple generated
+asteroid visuals, and that split children retain the expected size tier.

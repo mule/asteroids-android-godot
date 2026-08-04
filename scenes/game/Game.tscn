@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://bqsky4x01tinn"]
+[gd_scene load_steps=16 format=3 uid="uid://bqsky4x01tinn"]
 
 [ext_resource type="Script" path="res://scripts/game.gd" id="1_m6aai"]
 [ext_resource type="PackedScene" path="res://scenes/entities/PlayerShip.tscn" id="2_mgmqj"]
@@ -8,6 +8,12 @@
 [ext_resource type="Script" path="res://scripts/player_input.gd" id="6_8dbn6"]
 [ext_resource type="Script" path="res://scripts/starfield.gd" id="7_3jtpl"]
 [ext_resource type="Script" path="res://scripts/feedback.gd" id="8_s7x2j"]
+[ext_resource type="Resource" path="res://assets/generated/asteroids/asteroid_baseline_01.tres" id="9_0bsm8"]
+[ext_resource type="Resource" path="res://assets/generated/asteroids/asteroid_cobalt_01.tres" id="10_xpoo4"]
+[ext_resource type="Resource" path="res://assets/generated/asteroids/asteroid_craggy_01.tres" id="11_qkpjg"]
+[ext_resource type="Resource" path="res://assets/generated/asteroids/asteroid_ice_01.tres" id="12_s7b4h"]
+[ext_resource type="Resource" path="res://assets/generated/asteroids/asteroid_iron_01.tres" id="13_m2hh0"]
+[ext_resource type="Resource" path="res://assets/generated/asteroids/asteroid_shale_01.tres" id="14_pdu2q"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_xh3dq"]
 size = Vector2(1152, 648)
@@ -17,6 +23,7 @@ process_mode = 3
 script = ExtResource("1_m6aai")
 asteroid_scene = ExtResource("3_tct56")
 bullet_scene = ExtResource("4_1nphu")
+asteroid_visual_assets = Array[Resource]([ExtResource("9_0bsm8"), ExtResource("10_xpoo4"), ExtResource("11_qkpjg"), ExtResource("12_s7b4h"), ExtResource("13_m2hh0"), ExtResource("14_pdu2q")])
 
 [node name="Background" type="ColorRect" parent="."]
 offset_right = 1152.0

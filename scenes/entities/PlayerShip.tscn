@@ -1,7 +1,7 @@
 [gd_scene load_steps=4 format=3 uid="uid://c3o6vlwt3smug"]
 
 [ext_resource type="Script" path="res://scripts/player_ship.gd" id="1_1sojc"]
-[ext_resource type="Resource" path="res://assets/vector/baseline_ship.tres" id="2_a4c52"]
+[ext_resource type="Resource" path="res://assets/generated/ships/ship_delta_01.tres" id="2_a4c52"]
 
 [sub_resource type="ConvexPolygonShape2D" id="ConvexPolygonShape2D_jvily"]
 points = PackedVector2Array(0, -28, 18, 22, -18, 22)

@@ -11,7 +11,7 @@ enum AsteroidSize {
 	SMALL,
 }
 
-@export var visual_asset: Resource = preload("res://assets/vector/baseline_asteroid.tres")
+@export var visual_asset: Resource = preload("res://assets/generated/asteroids/asteroid_baseline_01.tres")
 @export var shader_lighting_enabled: bool = true
 @export_enum("Large", "Medium", "Small") var size_tier: int = AsteroidSize.LARGE
 @export var drift_speed: float = 90.0
@@ -39,11 +39,16 @@ func _physics_process(delta: float) -> void:
 	_update_shader_light_direction()
 
 
-func setup(tier: int, initial_velocity: Vector2) -> void:
+func setup(tier: int, initial_velocity: Vector2, selected_visual_asset: Resource = null, initial_rotation: float = 0.0) -> void:
 	size_tier = tier
 	velocity = initial_velocity
+	rotation = initial_rotation
+
+	if _is_valid_visual_asset(selected_visual_asset):
+		visual_asset = selected_visual_asset
 
 	if is_node_ready():
+		_apply_visual_asset()
 		_apply_size_tier()
 
 
@@ -80,11 +85,7 @@ func _apply_size_tier() -> void:
 
 
 func _apply_visual_asset() -> void:
-	if (
-		visual_asset == null
-		or not visual_asset.has_method("is_primary_polygon_valid")
-		or not visual_asset.is_primary_polygon_valid()
-	):
+	if not _is_valid_visual_asset(visual_asset):
 		return
 
 	rock_shape.polygon = visual_asset.primary_polygon
@@ -112,6 +113,20 @@ func _get_collision_radius() -> float:
 			return 28.0
 		_:
 			return 16.0
+
+
+func get_visual_asset_id() -> StringName:
+	if visual_asset != null:
+		return visual_asset.asset_id
+	return &""
+
+
+func _is_valid_visual_asset(candidate: Resource) -> bool:
+	return (
+		candidate != null
+		and candidate.has_method("is_primary_polygon_valid")
+		and candidate.is_primary_polygon_valid()
+	)
 
 
 func _wrap_to_visible_viewport() -> void:

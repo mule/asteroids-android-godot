@@ -5,7 +5,7 @@ const MATERIAL_RUNTIME := preload("res://scripts/material_runtime.gd")
 
 signal shoot_requested(muzzle_position: Vector2, direction: Vector2, inherited_velocity: Vector2)
 
-@export var visual_asset: Resource = preload("res://assets/vector/baseline_ship.tres")
+@export var visual_asset: Resource = preload("res://assets/generated/ships/ship_delta_01.tres")
 @export var shader_lighting_enabled: bool = true
 @export var acceleration: float = 360.0
 @export var max_speed: float = 520.0
