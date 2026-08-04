@@ -1,7 +1,7 @@
 extends Control
 
 
-const MANIFEST_PATH := "res://assets/generated/manifest.json"
+const DEFAULT_MANIFEST_PATH := "res://assets/generated/manifest.json"
 const CATEGORY_ORDER := ["ship", "asteroid", "bullet"]
 const CATEGORY_LABELS := {
 	"ship": "Ships",
@@ -136,9 +136,11 @@ var detail_label: Label
 var pause_button: Button
 var collision_button: Button
 var bounds_button: Button
+var manifest_path := DEFAULT_MANIFEST_PATH
 
 
 func _ready() -> void:
+	_apply_user_args()
 	records = _load_asset_records()
 	if records.any(func(record: AssetRecord) -> bool: return record.category == "asteroid"):
 		selected_category = "asteroid"
@@ -150,6 +152,12 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		get_tree().quit()
+
+
+func _apply_user_args() -> void:
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--manifest="):
+			manifest_path = argument.trim_prefix("--manifest=")
 
 
 func _build_ui() -> void:
@@ -381,9 +389,9 @@ func _load_asset_records() -> Array[AssetRecord]:
 
 
 func _load_manifest() -> Dictionary:
-	if not FileAccess.file_exists(MANIFEST_PATH):
+	if not FileAccess.file_exists(manifest_path):
 		return {"assets": []}
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(MANIFEST_PATH))
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(manifest_path))
 	if parsed is Dictionary:
 		return parsed
 	return {"assets": []}

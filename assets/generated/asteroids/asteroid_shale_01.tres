@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="VectorAssetDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_definition.gd" id="1_vector_definition"]
+[ext_resource type="Resource" path="res://assets/generated/materials/asteroid_faceted_shale.tres" id="2_asteroid_faceted_shale"]
+
+[resource]
+script = ExtResource("1_vector_definition")
+asset_id = &"asteroid_shale_01"
+category = 1
+primary_polygon = PackedVector2Array(-48, -12, -34, -38, -4, -48, 30, -36, 48, -10, 38, 26, 8, 48, -30, 34, -52, 8)
+fill_color = Color(0.48, 0.52, 0.56, 1)
+material_definition = ExtResource("2_asteroid_faceted_shale")
+collision_radius = 52
+tags = PackedStringArray("candidate", "rock", "shale")
+provenance_reference = "art/approved/asteroid_shale_01.json"

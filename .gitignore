@@ -5,10 +5,16 @@
 # AI/provider asset pipeline scratch output
 art/generated/**
 !art/generated/.gitkeep
+!art/generated/examples/
+!art/generated/examples/**
 art/rejected/**
 !art/rejected/.gitkeep
 art/experiments/**
 !art/experiments/.gitkeep
+!art/experiments/README.md
+!art/experiments/*.md
+!art/experiments/templates/
+!art/experiments/templates/**
 
 # Python tooling caches
 __pycache__/

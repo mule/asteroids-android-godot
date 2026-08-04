@@ -1,0 +1,89 @@
+{
+  "approval": {
+    "reviewer": "japurane",
+    "status": "approved"
+  },
+  "asset_id": "asteroid_cobalt_01",
+  "category": "asteroid",
+  "collision": {
+    "radius": 51,
+    "type": "circle"
+  },
+  "fill_color": [
+    0.42,
+    0.58,
+    0.72,
+    1
+  ],
+  "material": {
+    "ambient": 0.38,
+    "base_tint": [
+      0.82,
+      0.94,
+      1,
+      1
+    ],
+    "diffuse_strength": 0.66,
+    "facet_strength": 0.56,
+    "highlight_strength": 0.12,
+    "light_band_count": 5,
+    "material_id": "asteroid_faceted_cobalt",
+    "noise_scale": 0.04,
+    "noise_seed": 6724,
+    "noise_strength": 0.13,
+    "shader_mode": "asteroid_faceted"
+  },
+  "primary_polygon": [
+    [
+      -42,
+      -28
+    ],
+    [
+      -12,
+      -50
+    ],
+    [
+      22,
+      -42
+    ],
+    [
+      48,
+      -16
+    ],
+    [
+      44,
+      22
+    ],
+    [
+      12,
+      48
+    ],
+    [
+      -26,
+      40
+    ],
+    [
+      -50,
+      4
+    ]
+  ],
+  "provenance": {
+    "created_at": "2026-08-04",
+    "generator": "codex",
+    "manual_edits": "Hand-normalized from the issue 29 prompt workflow example.",
+    "model": "gpt-5-codex",
+    "notes": "Cool mineral asteroid candidate with a compact silhouette.",
+    "prompt_file": "art/prompts/asteroid-silhouette.md",
+    "prompt_revision": "issue-29",
+    "seed": "manual-cobalt-01",
+    "source_license": "project-owned"
+  },
+  "requires_symmetry": false,
+  "schema_version": "vector-asset/v1",
+  "secondary_polygons": [],
+  "tags": [
+    "candidate",
+    "cobalt",
+    "rock"
+  ]
+}

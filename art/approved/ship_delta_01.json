@@ -1,0 +1,136 @@
+{
+  "approval": {
+    "reviewer": "japurane",
+    "status": "approved"
+  },
+  "asset_id": "ship_delta_01",
+  "category": "ship",
+  "collision": {
+    "polygon": [
+      [
+        0,
+        -32
+      ],
+      [
+        24,
+        28
+      ],
+      [
+        -24,
+        28
+      ]
+    ],
+    "type": "convex_polygon"
+  },
+  "fill_color": [
+    0.78,
+    0.92,
+    1,
+    1
+  ],
+  "material": {
+    "ambient": 0.4,
+    "diffuse_strength": 0.62,
+    "highlight_strength": 0.18,
+    "light_band_count": 4,
+    "material_id": "ship_lit_delta",
+    "shader_mode": "lit_vector"
+  },
+  "primary_polygon": [
+    [
+      0,
+      -32
+    ],
+    [
+      14,
+      12
+    ],
+    [
+      24,
+      28
+    ],
+    [
+      8,
+      20
+    ],
+    [
+      0,
+      14
+    ],
+    [
+      -8,
+      20
+    ],
+    [
+      -24,
+      28
+    ],
+    [
+      -14,
+      12
+    ]
+  ],
+  "provenance": {
+    "created_at": "2026-08-04",
+    "generator": "codex",
+    "manual_edits": "Hand-normalized from the issue 29 prompt workflow example.",
+    "model": "gpt-5-codex",
+    "notes": "Alternate delta-wing player ship candidate for workflow demonstration.",
+    "prompt_file": "art/prompts/ship-silhouette.md",
+    "prompt_revision": "issue-29",
+    "seed": "manual-delta-01",
+    "source_license": "project-owned"
+  },
+  "requires_symmetry": true,
+  "schema_version": "vector-asset/v1",
+  "secondary_polygons": [
+    {
+      "fill_color": [
+        1,
+        0.48,
+        0.16,
+        0.9
+      ],
+      "material": {
+        "emission_color": [
+          1,
+          0.28,
+          0.08,
+          1
+        ],
+        "emission_intensity": 0.62,
+        "material_id": "thrust_emissive_delta",
+        "shader_mode": "emissive"
+      },
+      "polygon": [
+        [
+          10,
+          26
+        ],
+        [
+          4,
+          54
+        ],
+        [
+          0,
+          38
+        ],
+        [
+          -4,
+          54
+        ],
+        [
+          -10,
+          26
+        ]
+      ],
+      "polygon_id": "thrust_flame",
+      "visible_by_default": false
+    }
+  ],
+  "tags": [
+    "candidate",
+    "delta",
+    "player"
+  ]
+}

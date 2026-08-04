@@ -12,6 +12,17 @@
       "source_sha256": "1e62f2dffb7aa2058872a2d116bf3e7e2da9059509129edd44bf2c1228b9385c"
     },
     {
+      "asset_id": "asteroid_cobalt_01",
+      "category": "asteroid",
+      "material_ids": [
+        "asteroid_faceted_cobalt"
+      ],
+      "output_path": "assets/generated/asteroids/asteroid_cobalt_01.tres",
+      "schema_version": "vector-asset/v1",
+      "source_path": "art/approved/asteroid_cobalt_01.json",
+      "source_sha256": "650249ae901f8ccfa2ea909f632189608cfb5d1fe930a5564c3714b8bf2779a6"
+    },
+    {
       "asset_id": "asteroid_craggy_01",
       "category": "asteroid",
       "material_ids": [
@@ -45,6 +56,17 @@
       "source_sha256": "d92433974c616143cc73d1621a45af4b3400a20cd099998ececba0e90e1c7305"
     },
     {
+      "asset_id": "asteroid_shale_01",
+      "category": "asteroid",
+      "material_ids": [
+        "asteroid_faceted_shale"
+      ],
+      "output_path": "assets/generated/asteroids/asteroid_shale_01.tres",
+      "schema_version": "vector-asset/v1",
+      "source_path": "art/approved/asteroid_shale_01.json",
+      "source_sha256": "aceea15e2b32d9e4bd1fa8e4d303f5ec51236ea7ed666fb04935478350c60ced"
+    },
+    {
       "asset_id": "bullet_baseline_01",
       "category": "bullet",
       "material_ids": [
@@ -66,6 +88,18 @@
       "schema_version": "vector-asset/v1",
       "source_path": "art/approved/ship_baseline_01.json",
       "source_sha256": "34a82db236481fa0f42bee3b126c5bfee3938027c6c9cb0af3fcbf495088d26e"
+    },
+    {
+      "asset_id": "ship_delta_01",
+      "category": "ship",
+      "material_ids": [
+        "ship_lit_delta",
+        "thrust_emissive_delta"
+      ],
+      "output_path": "assets/generated/ships/ship_delta_01.tres",
+      "schema_version": "vector-asset/v1",
+      "source_path": "art/approved/ship_delta_01.json",
+      "source_sha256": "3d8929355c50930247b284b8457dab415a2f80ea61d665bc87d8a8f9cda605ae"
     }
   ],
   "materials": [
@@ -73,6 +107,12 @@
       "material_id": "asteroid_faceted_baseline",
       "output_path": "assets/generated/materials/asteroid_faceted_baseline.tres",
       "owner_asset_id": "asteroid_baseline_01",
+      "shader_mode": "asteroid_faceted"
+    },
+    {
+      "material_id": "asteroid_faceted_cobalt",
+      "output_path": "assets/generated/materials/asteroid_faceted_cobalt.tres",
+      "owner_asset_id": "asteroid_cobalt_01",
       "shader_mode": "asteroid_faceted"
     },
     {
@@ -94,6 +134,12 @@
       "shader_mode": "asteroid_faceted"
     },
     {
+      "material_id": "asteroid_faceted_shale",
+      "output_path": "assets/generated/materials/asteroid_faceted_shale.tres",
+      "owner_asset_id": "asteroid_shale_01",
+      "shader_mode": "asteroid_faceted"
+    },
+    {
       "material_id": "bullet_emissive_baseline",
       "output_path": "assets/generated/materials/bullet_emissive_baseline.tres",
       "owner_asset_id": "bullet_baseline_01",
@@ -106,9 +152,21 @@
       "shader_mode": "lit_vector"
     },
     {
+      "material_id": "ship_lit_delta",
+      "output_path": "assets/generated/materials/ship_lit_delta.tres",
+      "owner_asset_id": "ship_delta_01",
+      "shader_mode": "lit_vector"
+    },
+    {
       "material_id": "thrust_emissive_baseline",
       "output_path": "assets/generated/materials/thrust_emissive_baseline.tres",
       "owner_asset_id": "ship_baseline_01",
+      "shader_mode": "emissive"
+    },
+    {
+      "material_id": "thrust_emissive_delta",
+      "output_path": "assets/generated/materials/thrust_emissive_delta.tres",
+      "owner_asset_id": "ship_delta_01",
       "shader_mode": "emissive"
     }
   ],

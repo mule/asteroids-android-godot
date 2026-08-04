@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="VectorAssetDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_definition.gd" id="1_vector_definition"]
+[ext_resource type="Resource" path="res://assets/generated/materials/asteroid_faceted_cobalt.tres" id="2_asteroid_faceted_cobalt"]
+
+[resource]
+script = ExtResource("1_vector_definition")
+asset_id = &"asteroid_cobalt_01"
+category = 1
+primary_polygon = PackedVector2Array(-42, -28, -12, -50, 22, -42, 48, -16, 44, 22, 12, 48, -26, 40, -50, 4)
+fill_color = Color(0.42, 0.58, 0.72, 1)
+material_definition = ExtResource("2_asteroid_faceted_cobalt")
+collision_radius = 51
+tags = PackedStringArray("candidate", "cobalt", "rock")
+provenance_reference = "art/approved/asteroid_cobalt_01.json"

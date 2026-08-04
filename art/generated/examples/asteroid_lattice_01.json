@@ -1,0 +1,40 @@
+{
+  "schema_version": "vector-asset/v1",
+  "asset_id": "asteroid_lattice_01",
+  "category": "asteroid",
+  "primary_polygon": [[-46, -20], [-18, -46], [16, -44], [42, -22], [52, 12], [30, 42], [-8, 50], [-38, 30], [-54, 0]],
+  "fill_color": [0.56, 0.56, 0.62, 1.0],
+  "material": {
+    "material_id": "asteroid_faceted_lattice",
+    "shader_mode": "asteroid_faceted",
+    "base_tint": [0.98, 0.98, 1.0, 1.0],
+    "ambient": 0.33,
+    "diffuse_strength": 0.7,
+    "light_band_count": 4,
+    "highlight_strength": 0.09,
+    "noise_seed": 3001,
+    "noise_scale": 0.055,
+    "noise_strength": 0.2,
+    "facet_strength": 0.7
+  },
+  "collision": {
+    "type": "circle",
+    "radius": 54
+  },
+  "tags": ["candidate", "rock", "lattice"],
+  "provenance": {
+    "generator": "codex",
+    "model": "gpt-5-codex",
+    "prompt_file": "art/prompts/asteroid-silhouette.md",
+    "prompt_revision": "issue-29",
+    "created_at": "2026-08-04",
+    "seed": "manual-lattice-01",
+    "manual_edits": "Hand-normalized from the issue 29 prompt workflow example.",
+    "source_license": "project-owned",
+    "notes": "Deferred candidate; stronger texture idea but less distinct at phone scale."
+  },
+  "approval": {
+    "status": "rejected",
+    "reviewer": "japurane"
+  }
+}
