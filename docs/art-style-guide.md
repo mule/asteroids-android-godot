@@ -69,6 +69,13 @@ remain believable from every angle:
 - Do not paint a fixed external light source that contradicts rotation.
 - Asteroid facets may imply volume, but the silhouette must still carry the
   gameplay read.
+- Runtime vector assets may use shared shader-driven lighting. The authoritative
+  light direction lives in the game controller and is transformed into each
+  rotating object's local shader space so highlights appear stable in world
+  space.
+- Use 3-5 stepped lighting bands for the initial arcade look. Avoid expensive
+  realistic shading until Android and Steam Deck targets have been profiled.
+- Keep an unlit fallback available for debugging and readability comparison.
 
 ## Effects
 
@@ -76,8 +83,24 @@ Effects should clarify state:
 
 - Thrust indicates acceleration and should sit behind the ship body.
 - Bullet color should separate shots from stars and asteroid fragments.
+- Bullets and thrust should use the emissive/unlit material path rather than
+  diffuse lighting.
 - Explosion, hit, and spawn effects may be more expressive in later issues, but
   they must not obscure collision-critical objects for long.
+
+## Purchased raster asset contract
+
+Purchased or generated raster assets are compatible with the shared lighting
+direction only when they meet these constraints:
+
+- Transparent top-down source with a centered pivot and canonical forward
+  orientation.
+- Neutral albedo or very weak baked lighting.
+- No cast shadow or directional drop shadow baked into the color texture.
+- Optional normal and emission maps are welcome when they match the same pivot,
+  scale, and orientation as the albedo.
+- Highlights and shadows must not visibly rotate against the world light when
+  the object spins.
 
 ## Mobile readability checks
 
@@ -90,4 +113,3 @@ Review each candidate at:
 
 Reject assets that only look good when enlarged, blur into the starfield, lose
 their forward direction, or depend on a fixed lighting angle.
-

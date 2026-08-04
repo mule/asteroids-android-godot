@@ -4,6 +4,12 @@
   "category": "bullet",
   "primary_polygon": [[0, -8], [6, 0], [0, 8], [-6, 0]],
   "fill_color": [1.0, 0.95, 0.42, 1.0],
+  "material": {
+    "material_id": "bullet_emissive_baseline",
+    "shader_mode": "emissive",
+    "emission_color": [1.0, 0.82, 0.16, 1.0],
+    "emission_intensity": 0.45
+  },
   "collision": {
     "type": "circle",
     "radius": 5

@@ -16,6 +16,8 @@ const ASTEROID_SMALL := 2
 @export var respawn_delay_seconds: float = 1.2
 @export var respawn_invulnerability_seconds: float = 2.0
 @export var random_seed: int = 1729
+@export var world_light_direction: Vector2 = Vector2(-0.55, -0.83)
+@export var shader_lighting_enabled: bool = true
 
 @onready var entities: Node2D = $Entities
 @onready var player_ship: Area2D = $Entities/PlayerShip
@@ -34,12 +36,14 @@ var respawning: bool = false
 
 func _ready() -> void:
 	random.seed = random_seed
+	world_light_direction = world_light_direction.normalized()
 	player_ship.shoot_requested.connect(_on_player_ship_shoot_requested)
 	player_ship.area_entered.connect(_on_player_ship_area_entered)
 	hud.pause_requested.connect(_pause_game)
 	hud.resume_requested.connect(_resume_game)
 	hud.restart_requested.connect(_start_new_game)
 	hud.touch_action_changed.connect(_on_hud_touch_action_changed)
+	_apply_lighting_to_entity(player_ship)
 	_start_new_game()
 
 
@@ -52,6 +56,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if not play_active and event.is_action_pressed("restart"):
 		_start_new_game()
+
+	if event.is_action_pressed("toggle_shader_lighting"):
+		_toggle_shader_lighting()
 
 
 func _start_new_game() -> void:
@@ -84,6 +91,7 @@ func _on_player_ship_shoot_requested(
 	entities.add_child(bullet)
 	bullet.add_to_group("bullets")
 	bullet.global_position = muzzle_position
+	_apply_lighting_to_entity(bullet)
 
 	if bullet.has_method("launch"):
 		bullet.launch(direction, inherited_velocity)
@@ -125,6 +133,7 @@ func _spawn_asteroid(size_tier: int, spawn_position: Vector2, velocity: Vector2)
 	entities.add_child(asteroid)
 	asteroid.add_to_group("asteroids")
 	asteroid.global_position = spawn_position
+	_apply_lighting_to_entity(asteroid)
 
 	if asteroid.has_signal("destroyed"):
 		asteroid.destroyed.connect(_on_asteroid_destroyed)
@@ -256,6 +265,27 @@ func _resume_game() -> void:
 	paused = false
 	get_tree().paused = false
 	hud.hide_status()
+
+
+func _toggle_shader_lighting() -> void:
+	shader_lighting_enabled = not shader_lighting_enabled
+	_apply_lighting_to_entities()
+
+
+func _apply_lighting_to_entities() -> void:
+	for entity in entities.get_children():
+		_apply_lighting_to_entity(entity)
+
+
+func _apply_lighting_to_entity(entity: Node) -> void:
+	if entity == null:
+		return
+
+	if entity.has_method("set_world_light_direction"):
+		entity.set_world_light_direction(world_light_direction)
+
+	if entity.has_method("set_shader_lighting_enabled"):
+		entity.set_shader_lighting_enabled(shader_lighting_enabled)
 
 
 func _on_hud_touch_action_changed(action: StringName, pressed: bool) -> void:

@@ -1,7 +1,10 @@
 extends Area2D
 
 
+const MATERIAL_RUNTIME := preload("res://scripts/material_runtime.gd")
+
 @export var visual_asset: Resource = preload("res://assets/vector/baseline_bullet.tres")
+@export var shader_lighting_enabled: bool = true
 @export var speed: float = 760.0
 @export var lifetime_seconds: float = 1.2
 @export var wrap_margin: float = 8.0
@@ -10,6 +13,7 @@ extends Area2D
 
 var velocity: Vector2 = Vector2.ZERO
 var lifetime_remaining: float = 0.0
+var bullet_material: ShaderMaterial
 
 
 func _ready() -> void:
@@ -40,6 +44,15 @@ func _on_area_entered(area: Area2D) -> void:
 		queue_free()
 
 
+func set_shader_lighting_enabled(value: bool) -> void:
+	shader_lighting_enabled = value
+	MATERIAL_RUNTIME.set_lighting_enabled(bullet_material, value)
+
+
+func set_world_light_direction(value: Vector2) -> void:
+	pass
+
+
 func _wrap_to_visible_viewport() -> void:
 	var viewport_rect := get_viewport_rect()
 	var min_position := viewport_rect.position - Vector2.ONE * wrap_margin
@@ -66,3 +79,5 @@ func _apply_visual_asset() -> void:
 
 	bullet_shape.polygon = visual_asset.primary_polygon
 	bullet_shape.color = visual_asset.fill_color
+	bullet_material = MATERIAL_RUNTIME.apply_material_definition(bullet_shape, visual_asset.material_definition)
+	set_shader_lighting_enabled(shader_lighting_enabled)

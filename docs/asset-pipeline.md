@@ -71,6 +71,11 @@ Runtime vector resources live under `assets/vector/`. These `.tres` files are
 Godot-ready transforms of approved source definitions; entity scenes may assign
 them through exported `visual_asset` properties.
 
+Runtime material resources live under `assets/materials/`, with shaders under
+`assets/shaders/`. `AssetMaterialDefinition` resources describe shader IDs,
+lighting bands, ambient/diffuse response, emission, and deterministic
+facet/noise parameters separately from polygon geometry.
+
 ## Asset IDs and file names
 
 Use lowercase snake case for every asset ID and file stem:
@@ -153,6 +158,21 @@ Runtime asset integration work must also use the Android export guide:
    property or to a scene instance used for review.
 6. Run the desktop and Android verification expected by the task that changes
    runtime assets.
+
+## Adding a material variant
+
+1. Add or update an `AssetMaterialDefinition` under `assets/materials/`.
+2. Reference a shader from `assets/shaders/`.
+3. Keep the material parameters deterministic: no runtime random mutation of
+   shared resources.
+4. Assign the material resource from a vector asset's `material_definition` or a
+   secondary polygon's `material_definition`.
+5. Use the `toggle_shader_lighting` input action, bound to `L`, to compare the
+   shader-lit result with the unlit baseline at gameplay scale.
+
+`Game.gd` owns the authoritative `world_light_direction`. Entity scripts receive
+that direction and rotate it into local shader space before updating their
+per-instance material. Shared material resources are never mutated per frame.
 
 ## Validating vector source assets
 

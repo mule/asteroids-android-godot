@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="AssetMaterialDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/asset_material_definition.gd" id="1_5bhfs"]
+[ext_resource type="Shader" path="res://assets/shaders/vector_lit.gdshader" id="2_4dx3q"]
+
+[resource]
+script = ExtResource("1_5bhfs")
+material_id = &"ship_lit_baseline"
+shader_mode = 1
+shader = ExtResource("2_4dx3q")
+ambient = 0.42
+diffuse_strength = 0.58
+light_band_count = 4
+highlight_strength = 0.12

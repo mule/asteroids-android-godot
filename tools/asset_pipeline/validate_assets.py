@@ -16,6 +16,7 @@ from typing import Any, Iterable, Sequence
 
 SCHEMA_VERSION = "vector-asset/v1"
 SUPPORTED_CATEGORIES = {"ship", "asteroid", "bullet"}
+SUPPORTED_SHADER_MODES = {"unlit", "lit_vector", "asteroid_faceted", "emissive"}
 ASSET_ID_RE = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*_[0-9]{2}$")
 TOKEN_RE = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
 EDGE_TOLERANCE = 0.25
@@ -84,6 +85,8 @@ def validate_asset(data: Any) -> dict[str, Any]:
     normalized["fill_color"] = _normalize_color(normalized.get("fill_color"), "fill_color")
     if "outline" in normalized:
         _validate_outline(normalized["outline"])
+    if "material" in normalized:
+        normalized["material"] = _normalize_material(normalized["material"], "material")
 
     secondary_polygons = normalized.get("secondary_polygons", [])
     if not isinstance(secondary_polygons, list):
@@ -160,6 +163,7 @@ def _deterministic_asset(asset: dict[str, Any]) -> dict[str, Any]:
         "primary_polygon",
         "fill_color",
         "outline",
+        "material",
         "secondary_polygons",
         "collision",
         "requires_symmetry",
@@ -186,8 +190,63 @@ def _normalize_secondary_polygon(data: Any, field: str) -> dict[str, Any]:
         "fill_color": _normalize_color(data.get("fill_color"), f"{field}.fill_color"),
         "visible_by_default": data.get("visible_by_default", True),
     }
+    if "material" in data:
+        normalized["material"] = _normalize_material(data["material"], f"{field}.material")
     if not isinstance(normalized["visible_by_default"], bool):
         raise ValidationError(f"{field}.visible_by_default", "must be a boolean")
+    return normalized
+
+
+def _normalize_material(data: Any, field: str) -> dict[str, Any]:
+    if not isinstance(data, dict):
+        raise ValidationError(field, "must be an object")
+
+    material_id = _require_string(data, f"{field}.material_id")
+    if not TOKEN_RE.fullmatch(material_id):
+        raise ValidationError(f"{field}.material_id", "must be lowercase snake_case")
+
+    shader_mode = _require_string(data, f"{field}.shader_mode")
+    if shader_mode not in SUPPORTED_SHADER_MODES:
+        raise ValidationError(f"{field}.shader_mode", f"must be one of {sorted(SUPPORTED_SHADER_MODES)}")
+
+    normalized: dict[str, Any] = {
+        "material_id": material_id,
+        "shader_mode": shader_mode,
+    }
+    if "base_tint" in data:
+        normalized["base_tint"] = _normalize_color(data["base_tint"], f"{field}.base_tint")
+    for key, minimum, maximum in [
+        ("ambient", 0.0, 1.0),
+        ("diffuse_strength", 0.0, 2.0),
+        ("highlight_strength", 0.0, 1.0),
+        ("emission_intensity", 0.0, 8.0),
+        ("noise_scale", 0.0, 0.25),
+        ("noise_strength", 0.0, 1.0),
+        ("facet_strength", 0.0, 1.0),
+    ]:
+        if key in data:
+            value = _number(data[key], f"{field}.{key}")
+            if value < minimum or value > maximum:
+                raise ValidationError(f"{field}.{key}", f"must be between {minimum:g} and {maximum:g}")
+            normalized[key] = _stable_number(value)
+
+    if "light_band_count" in data:
+        light_band_count = data["light_band_count"]
+        if not isinstance(light_band_count, int) or isinstance(light_band_count, bool):
+            raise ValidationError(f"{field}.light_band_count", "must be an integer")
+        if light_band_count < 1 or light_band_count > 8:
+            raise ValidationError(f"{field}.light_band_count", "must be between 1 and 8")
+        normalized["light_band_count"] = light_band_count
+
+    if "noise_seed" in data:
+        noise_seed = data["noise_seed"]
+        if not isinstance(noise_seed, int) or isinstance(noise_seed, bool):
+            raise ValidationError(f"{field}.noise_seed", "must be an integer")
+        normalized["noise_seed"] = noise_seed
+
+    if "emission_color" in data:
+        normalized["emission_color"] = _normalize_color(data["emission_color"], f"{field}.emission_color")
+
     return normalized
 
 

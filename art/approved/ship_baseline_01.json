@@ -4,11 +4,25 @@
   "category": "ship",
   "primary_polygon": [[0, -28], [18, 22], [0, 12], [-18, 22]],
   "fill_color": [0.9, 0.95, 1.0, 1.0],
+  "material": {
+    "material_id": "ship_lit_baseline",
+    "shader_mode": "lit_vector",
+    "ambient": 0.42,
+    "diffuse_strength": 0.58,
+    "light_band_count": 4,
+    "highlight_strength": 0.12
+  },
   "secondary_polygons": [
     {
       "polygon_id": "thrust_flame",
       "polygon": [[-9, 22], [-3, 50], [0, 34], [3, 50], [9, 22]],
       "fill_color": [1.0, 0.596078, 0.196078, 0.92],
+      "material": {
+        "material_id": "thrust_emissive_baseline",
+        "shader_mode": "emissive",
+        "emission_color": [1.0, 0.36, 0.08, 1.0],
+        "emission_intensity": 0.55
+      },
       "visible_by_default": false
     }
   ],

@@ -18,6 +18,7 @@ enum Category {
 @export var fill_color: Color = Color.WHITE
 @export var outline_color: Color = Color.TRANSPARENT
 @export_range(0.0, 16.0, 0.25, "or_greater") var outline_width: float = 0.0
+@export var material_definition: Resource
 @export var secondary_polygons: Array[Resource] = []
 @export var use_collision_polygon: bool = false
 @export var collision_polygon: PackedVector2Array

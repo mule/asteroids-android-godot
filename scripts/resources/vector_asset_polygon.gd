@@ -5,6 +5,7 @@ class_name VectorAssetPolygon
 @export var polygon_id: StringName
 @export var polygon: PackedVector2Array
 @export var fill_color: Color = Color.WHITE
+@export var material_definition: Resource
 @export var visible_by_default: bool = true
 
 
