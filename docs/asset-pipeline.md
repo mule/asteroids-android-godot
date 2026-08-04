@@ -249,3 +249,36 @@ The builder creates or updates only files declared by the current build. It does
 not delete unknown files automatically. In `--check` mode, it reports missing or
 stale generated files and also flags files still listed by an older manifest
 when those files are no longer part of the current generated set.
+
+## Reviewing generated assets in-engine
+
+Launch the asset gallery scene without changing the committed main scene:
+
+```sh
+/home/japurane/.local/bin/godot --path . scenes/tools/AssetGallery.tscn
+```
+
+The gallery reads `assets/generated/manifest.json`, groups generated vector
+assets by category, and shows canonical, rotating, gameplay-scale, and
+phone-scale previews. Use the toolbar to switch categories, pause rotation, and
+toggle collision or bounds overlays. Broken or missing generated resources are
+reported in the detail panel instead of crashing the gallery.
+
+Smoke-test the gallery without opening a desktop window:
+
+```sh
+/home/japurane/.local/bin/godot --headless --path . --script tools/asset_pipeline/check_asset_gallery.gd
+```
+
+Capture a local contact sheet for review:
+
+```sh
+/home/japurane/.local/bin/godot --path . --script tools/asset_pipeline/capture_asset_gallery.gd -- --output=res://art/generated/asset_gallery_contact_sheet.png
+```
+
+Contact-sheet capture needs a rendering display driver; use the smoke-test
+command for headless automation.
+
+For Android review, temporarily launch the same scene from the editor or a local
+export override, then discard the local scene-setting change before committing.
+The committed `project.godot` main scene must remain `res://scenes/game/Main.tscn`.

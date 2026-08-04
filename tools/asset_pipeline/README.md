@@ -48,3 +48,26 @@ Confirm Godot can load every manifest entry:
 The builder only reads approved specs by default. To build from a staging
 directory, pass both `--source-dir` and `--allow-unapproved` so the nonproduction
 input is explicit.
+
+## Review generated assets
+
+```sh
+/home/japurane/.local/bin/godot --path . scenes/tools/AssetGallery.tscn
+```
+
+The gallery loads `assets/generated/manifest.json`, groups generated vector
+assets by category, and provides rotating, canonical, gameplay-scale,
+phone-scale, collision, and bounds previews without changing the gameplay main
+scene.
+
+Smoke-test the gallery UI tree:
+
+```sh
+/home/japurane/.local/bin/godot --headless --path . --script tools/asset_pipeline/check_asset_gallery.gd
+```
+
+Capture an ignored local contact sheet:
+
+```sh
+/home/japurane/.local/bin/godot --path . --script tools/asset_pipeline/capture_asset_gallery.gd -- --output=res://art/generated/asset_gallery_contact_sheet.png
+```
