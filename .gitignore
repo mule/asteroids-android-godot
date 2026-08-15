@@ -1,6 +1,7 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+.idea/
 
 # AI/provider asset pipeline scratch output
 art/generated/**

@@ -17,6 +17,7 @@ enum AsteroidSize {
 @export var drift_speed: float = 90.0
 @export var rotation_speed_degrees: float = 25.0
 @export var wrap_margin: float = 48.0
+@export var bounce_restitution: float = 1.0
 
 @onready var rock_shape: Polygon2D = $RockShape
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
@@ -30,13 +31,27 @@ func _ready() -> void:
 	_apply_visual_asset()
 	_apply_size_tier()
 	_update_shader_light_direction()
+	area_entered.connect(_on_area_entered)
 
 
 func _physics_process(delta: float) -> void:
+	_limit_velocity_for_discrete_collision(delta)
 	position += velocity * delta
 	rotation += deg_to_rad(rotation_speed_degrees) * delta
 	_wrap_to_visible_viewport()
 	_update_shader_light_direction()
+	_resolve_asteroid_overlaps()
+
+
+func _limit_velocity_for_discrete_collision(delta: float) -> void:
+	if delta <= 0.0:
+		return
+
+	# Each asteroid may travel at most its own radius per physics tick. For any
+	# pair, their combined relative travel is therefore no greater than their
+	# combined radii, so they cannot cross completely between overlap snapshots.
+	var max_safe_speed := get_collision_radius() / delta
+	velocity = velocity.limit_length(max_safe_speed)
 
 
 func setup(tier: int, initial_velocity: Vector2, selected_visual_asset: Resource = null, initial_rotation: float = 0.0) -> void:
@@ -105,7 +120,7 @@ func _get_visual_scale() -> float:
 			return 0.36
 
 
-func _get_collision_radius() -> float:
+func get_collision_radius() -> float:
 	match size_tier:
 		AsteroidSize.LARGE:
 			return 44.0
@@ -113,6 +128,87 @@ func _get_collision_radius() -> float:
 			return 28.0
 		_:
 			return 16.0
+
+
+func _get_collision_radius() -> float:
+	return get_collision_radius()
+
+
+func get_mass() -> float:
+	match size_tier:
+		AsteroidSize.LARGE:
+			return 4.0
+		AsteroidSize.MEDIUM:
+			return 2.0
+		_:
+			return 1.0
+
+
+func _on_area_entered(area: Area2D) -> void:
+	if area.is_in_group("asteroids") and is_instance_valid(area) and not area.is_queued_for_deletion():
+		if get_instance_id() < area.get_instance_id():
+			_resolve_asteroid_collision(area)
+
+
+func _resolve_asteroid_overlaps() -> void:
+	for area in get_overlapping_areas():
+		if area.is_in_group("asteroids") and is_instance_valid(area) and not area.is_queued_for_deletion():
+			if get_instance_id() < area.get_instance_id():
+				_resolve_asteroid_collision(area)
+
+
+func _resolve_asteroid_collision(other: Area2D) -> void:
+	if not is_instance_valid(other) or other.is_queued_for_deletion():
+		return
+
+	var radius_a := get_collision_radius()
+	var radius_b: float = other.get_collision_radius() if other.has_method("get_collision_radius") else 28.0
+	var min_distance := radius_a + radius_b
+
+	var delta_pos := global_position - other.global_position
+	var current_distance := delta_pos.length()
+
+	if current_distance >= min_distance:
+		return
+
+	var normal: Vector2
+	if current_distance < 0.001:
+		var other_vel: Vector2 = other.get("velocity") if other.get("velocity") != null else Vector2.ZERO
+		var rel_vel := velocity - other_vel
+		if rel_vel.length_squared() > 0.01:
+			normal = -rel_vel.normalized()
+		else:
+			normal = Vector2.RIGHT.rotated(randf() * TAU)
+	else:
+		normal = delta_pos / current_distance
+
+	var overlap := min_distance - current_distance
+
+	var mass_a := get_mass()
+	var mass_b: float = other.get_mass() if other.has_method("get_mass") else 2.0
+	var total_mass := mass_a + mass_b
+
+	# Separate positions proportionally to inverse mass to prevent sticking and tunneling
+	var separation_a := normal * (overlap * (mass_b / total_mass))
+	var separation_b := normal * (overlap * (mass_a / total_mass))
+	global_position += separation_a
+	other.global_position -= separation_b
+	_wrap_to_visible_viewport()
+	if other.has_method("_wrap_to_visible_viewport"):
+		other._wrap_to_visible_viewport()
+
+	# Calculate velocity response (elastic bounce)
+	var vel_b: Vector2 = other.get("velocity") if other.get("velocity") != null else Vector2.ZERO
+	var rel_velocity := velocity - vel_b
+	var vel_along_normal := rel_velocity.dot(normal)
+
+	# Only apply impulse if objects are moving towards each other
+	if vel_along_normal < 0.0:
+		var impulse_scalar := -(1.0 + bounce_restitution) * vel_along_normal / ((1.0 / mass_a) + (1.0 / mass_b))
+		var impulse := normal * impulse_scalar
+		velocity += impulse / mass_a
+		if "velocity" in other:
+			other.velocity -= impulse / mass_b
 
 
 func get_visual_asset_id() -> StringName:
