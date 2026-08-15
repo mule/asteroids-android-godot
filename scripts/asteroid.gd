@@ -35,11 +35,23 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_limit_velocity_for_discrete_collision(delta)
 	position += velocity * delta
 	rotation += deg_to_rad(rotation_speed_degrees) * delta
 	_wrap_to_visible_viewport()
 	_update_shader_light_direction()
 	_resolve_asteroid_overlaps()
+
+
+func _limit_velocity_for_discrete_collision(delta: float) -> void:
+	if delta <= 0.0:
+		return
+
+	# Each asteroid may travel at most its own radius per physics tick. For any
+	# pair, their combined relative travel is therefore no greater than their
+	# combined radii, so they cannot cross completely between overlap snapshots.
+	var max_safe_speed := get_collision_radius() / delta
+	velocity = velocity.limit_length(max_safe_speed)
 
 
 func setup(tier: int, initial_velocity: Vector2, selected_visual_asset: Resource = null, initial_rotation: float = 0.0) -> void:

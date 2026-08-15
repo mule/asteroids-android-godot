@@ -11,6 +11,7 @@ func _init() -> void:
 	var failures: Array[String] = []
 
 	await _test_head_on_collision(failures)
+	await _test_high_speed_collision_does_not_tunnel(failures)
 	await _test_different_size_collision(failures)
 	await _test_glancing_collision(failures)
 	await _test_overlap_separation(failures)
@@ -62,6 +63,34 @@ func _test_head_on_collision(failures: Array[String]) -> void:
 
 	a1.queue_free()
 	a2.queue_free()
+	await physics_frame
+
+
+func _test_high_speed_collision_does_not_tunnel(failures: Array[String]) -> void:
+	var packed_scene := load(ASTEROID_SCENE) as PackedScene
+	var left := packed_scene.instantiate() as Area2D
+	var right := packed_scene.instantiate() as Area2D
+
+	root.add_child(left)
+	root.add_child(right)
+	left.add_to_group("asteroids")
+	right.add_to_group("asteroids")
+
+	left.setup(2, Vector2(10000, 0), null, 0.0)
+	right.setup(2, Vector2(-10000, 0), null, 0.0)
+	left.global_position = Vector2(450, 300)
+	right.global_position = Vector2(550, 300)
+
+	for _step in 8:
+		await physics_frame
+
+	if left.velocity.x >= 0.0:
+		failures.append("High speed: left asteroid tunneled through without bouncing; velocity.x is %f" % left.velocity.x)
+	if right.velocity.x <= 0.0:
+		failures.append("High speed: right asteroid tunneled through without bouncing; velocity.x is %f" % right.velocity.x)
+
+	left.queue_free()
+	right.queue_free()
 	await physics_frame
 
 
