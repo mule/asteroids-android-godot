@@ -1,9 +1,8 @@
-extends RefCounted
-class_name WorldBounds
-
 ## Static bounds math for sector space. Preload as a const, following the
 ## scripts/material_runtime.gd idiom:
 ##   const WORLD_BOUNDS := preload("res://scripts/world/world_bounds.gd")
+extends RefCounted
+class_name WorldBounds
 
 
 static func wrap_to_bounds(position: Vector2, bounds: Rect2, margin: float) -> Vector2:
@@ -63,9 +62,9 @@ static func reflect_velocity_at_edge(
 	return reflected
 
 
+## Inward push in the range 0.0 at the inner edge of the margin band to 1.0
+## at the wall. Exactly zero outside the band.
 static func edge_pressure(position: Vector2, bounds: Rect2, margin: float) -> Vector2:
-	## Inward push in the range 0.0 at the inner edge of the margin band to 1.0
-	## at the wall. Exactly zero outside the band.
 	if margin <= 0.0:
 		return Vector2.ZERO
 

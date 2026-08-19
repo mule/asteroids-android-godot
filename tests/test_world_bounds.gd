@@ -2,6 +2,7 @@ extends SceneTree
 
 
 const WORLD_BOUNDS := preload("res://scripts/world/world_bounds.gd")
+const SECTOR_DEFINITION := preload("res://assets/sectors/sector_default.tres")
 
 
 func _init() -> void:
@@ -12,6 +13,7 @@ func _init() -> void:
 	_test_is_outside_respects_radius(failures)
 	_test_reflect_only_when_moving_outward(failures)
 	_test_edge_pressure_ramps_inward(failures)
+	await _test_sector_is_never_smaller_than_the_viewport(failures)
 
 	for failure in failures:
 		printerr("FAIL: ", failure)
@@ -106,3 +108,28 @@ func _test_edge_pressure_ramps_inward(failures: Array[String]) -> void:
 	var right_wall := WORLD_BOUNDS.edge_pressure(Vector2(8000.0, 3000.0), bounds, margin)
 	if not is_equal_approx(right_wall.x, -1.0):
 		failures.append("Edge pressure: right wall must push left, got %f" % right_wall.x)
+
+
+func _test_sector_is_never_smaller_than_the_viewport(failures: Array[String]) -> void:
+	# project.godot stretches with aspect "expand", so the visible rect is only
+	# 1152x648 at exactly 16:9 and grows on every other window shape. The
+	# default sector is viewport-sized, so it must track that growth or
+	# entities wrap in the middle of the screen. See scripts/world/sector.gd.
+	var sector := Sector.new()
+	sector.definition = SECTOR_DEFINITION
+	root.add_child(sector)
+	await process_frame
+
+	var visible_rect := sector.get_viewport_rect()
+	var bounds: Rect2 = sector.get_bounds()
+
+	if not bounds.encloses(visible_rect):
+		failures.append(
+			"Sector: bounds %s must cover the visible rect %s" % [bounds, visible_rect]
+		)
+
+	if not bounds.encloses(SECTOR_DEFINITION.get_bounds()):
+		failures.append("Sector: bounds %s must cover the sector definition" % bounds)
+
+	sector.queue_free()
+	await process_frame

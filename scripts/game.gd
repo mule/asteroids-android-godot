@@ -23,7 +23,7 @@ const ASTEROID_SMALL := 2
 
 @onready var entities: Node2D = $Entities
 @onready var player_ship: Area2D = $Entities/PlayerShip
-@onready var sector: Node2D = $Sector
+@onready var sector: Sector = $Sector
 @onready var player_input: Node = $PlayerInput
 @onready var feedback: Node = $Feedback
 @onready var hud: CanvasLayer = $Hud
@@ -307,7 +307,7 @@ func _on_hud_touch_action_changed(action: StringName, pressed: bool) -> void:
 
 func _get_safe_spawn_position(index: int, asteroid_count: int) -> Vector2:
 	for attempt in 32:
-		var spawn_position: Vector2 = sector.get_random_position(random)
+		var spawn_position := sector.get_random_position(random)
 
 		if spawn_position.distance_to(player_ship.global_position) >= spawn_safe_radius:
 			return spawn_position
