@@ -30,6 +30,10 @@ static func clamp_to_sector(position: Vector2, bounds: Rect2, radius: float = 0.
 	)
 
 
+## True when a circle of the given radius is not fully inside the bounds. A
+## position still strictly inside the sector counts as outside once it comes
+## within radius of a wall, so this asks "is it clear of the edge", not "has it
+## left the sector".
 static func is_outside(position: Vector2, bounds: Rect2, radius: float = 0.0) -> bool:
 	return (
 		position.x < bounds.position.x + radius

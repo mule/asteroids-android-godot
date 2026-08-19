@@ -46,6 +46,10 @@ func _ready() -> void:
 	hud.resume_requested.connect(_resume_game)
 	hud.restart_requested.connect(_start_new_game)
 	hud.touch_action_changed.connect(_on_hud_touch_action_changed)
+	# The sector is at least viewport-sized, so a resize changes where the world
+	# ends. Entities are handed their bounds once at spawn, so without this they
+	# would keep wrapping against the size the window had when they appeared.
+	get_viewport().size_changed.connect(_apply_sector_bounds_to_entities)
 	_apply_lighting_to_entity(player_ship)
 	if auto_start:
 		_start_new_game()
@@ -294,6 +298,11 @@ func _apply_lighting_to_entity(entity: Node) -> void:
 		entity.set_shader_lighting_enabled(shader_lighting_enabled)
 
 	_apply_sector_bounds_to_entity(entity)
+
+
+func _apply_sector_bounds_to_entities() -> void:
+	for entity in entities.get_children():
+		_apply_sector_bounds_to_entity(entity)
 
 
 func _apply_sector_bounds_to_entity(entity: Node) -> void:

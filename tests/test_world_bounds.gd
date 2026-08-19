@@ -3,6 +3,7 @@ extends SceneTree
 
 const WORLD_BOUNDS := preload("res://scripts/world/world_bounds.gd")
 const SECTOR_DEFINITION := preload("res://assets/sectors/sector_default.tres")
+const GAME_SCENE := "res://scenes/game/Game.tscn"
 
 
 func _init() -> void:
@@ -14,6 +15,7 @@ func _init() -> void:
 	_test_reflect_only_when_moving_outward(failures)
 	_test_edge_pressure_ramps_inward(failures)
 	await _test_sector_is_never_smaller_than_the_viewport(failures)
+	await _test_entities_track_a_viewport_resize(failures)
 
 	for failure in failures:
 		printerr("FAIL: ", failure)
@@ -116,6 +118,12 @@ func _test_sector_is_never_smaller_than_the_viewport(failures: Array[String]) ->
 	# default sector is viewport-sized, so it must track that growth or
 	# entities wrap in the middle of the screen. See scripts/world/sector.gd.
 	var sector := Sector.new()
+	if sector == null:
+		# A parse error in sector.gd makes .new() return null. Without this the
+		# suite would sail past every assertion below and still report green.
+		failures.append("Sector: could not instantiate scripts/world/sector.gd")
+		return
+
 	sector.definition = SECTOR_DEFINITION
 	root.add_child(sector)
 	await process_frame
@@ -132,4 +140,35 @@ func _test_sector_is_never_smaller_than_the_viewport(failures: Array[String]) ->
 		failures.append("Sector: bounds %s must cover the sector definition" % bounds)
 
 	sector.queue_free()
+	await process_frame
+
+
+func _test_entities_track_a_viewport_resize(failures: Array[String]) -> void:
+	# Before #44 every entity re-read get_viewport_rect() each physics frame, so
+	# wrapping followed a window resize for free. Bounds are now handed out once
+	# at spawn, so game.gd has to re-push them or the ship keeps wrapping
+	# against the size the window had when it was created.
+	var game := (load(GAME_SCENE) as PackedScene).instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+
+	var original_size := root.size
+	root.size = Vector2i(1400, 500)
+	await process_frame
+	await process_frame
+
+	var visible_size := root.get_visible_rect().size
+	if visible_size == Vector2(original_size):
+		failures.append("Resize: the harness did not actually resize the viewport")
+
+	var ship_bounds: Rect2 = game.player_ship.sector_bounds
+	if ship_bounds.size != visible_size:
+		failures.append(
+			"Resize: player bounds %s must follow the visible rect %s"
+			% [ship_bounds.size, visible_size]
+		)
+
+	root.size = original_size
+	game.queue_free()
 	await process_frame
