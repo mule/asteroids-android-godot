@@ -2,7 +2,7 @@
 
 Date: 2026-08-19
 Status: Approved for planning
-Epic: Scrolling sector world (Space Rangers direction)
+Epic: [#43](https://github.com/mule/asteroids-android-godot/issues/43)
 
 ## Goal
 
@@ -236,22 +236,22 @@ foundation and deliver scrolling. Issues 5 through 9 fill the sector. Issues 10
 through 14 deliver the Space Rangers loop. Issues 15 and 16 make it playable
 and shippable.
 
-1. Sector definition and world-bounds authority — `enhancement` `godot`
-2. Follow camera with sector limits and look-ahead — `enhancement` `godot`
-3. Soft sector boundary and containment — `enhancement` `godot`
-4. Parallax star layers and deep-space background — `enhancement` `godot`
-5. Asteroid fields with seeded placement — `enhancement` `godot`
-6. Entity activation and simulation budget — `enhancement` `godot` `android`
-7. Asset families for celestial bodies, stations, and ship classes — `enhancement` `documentation`
-8. Planets and moons — `enhancement` `godot`
-9. Local gravity wells — `enhancement` `godot`
-10. Ship systems: hull, fuel, and credits — `enhancement` `godot`
-11. Space stations with docking, repair, and refuel — `enhancement` `godot`
-12. AI ship framework and hostile interceptors — `enhancement` `godot`
-13. Neutral freighters and station defenders — `enhancement` `godot`
-14. Threat escalation and run summary — `enhancement` `godot`
-15. Sector map, minimap, and off-screen markers — `enhancement` `godot` `android`
-16. Android performance verification and documentation — `android` `documentation`
+1. #44 Sector definition and world-bounds authority — `enhancement` `godot`
+2. #45 Follow camera with sector limits and look-ahead — `enhancement` `godot`
+3. #46 Soft sector boundary and containment — `enhancement` `godot`
+4. #47 Parallax star layers and deep-space background — `enhancement` `godot`
+5. #48 Asteroid fields with seeded placement — `enhancement` `godot`
+6. #49 Entity activation and simulation budget — `enhancement` `godot` `android`
+7. #50 Asset families for celestial bodies, stations, and ship classes — `enhancement` `documentation`
+8. #51 Planets and moons — `enhancement` `godot`
+9. #52 Local gravity wells — `enhancement` `godot`
+10. #53 Ship systems: hull, fuel, and credits — `enhancement` `godot`
+11. #54 Space stations with docking, repair, and refuel — `enhancement` `godot`
+12. #55 AI ship framework and hostile interceptors — `enhancement` `godot`
+13. #56 Neutral freighters and station defenders — `enhancement` `godot`
+14. #57 Threat escalation and run summary — `enhancement` `godot`
+15. #58 Sector map, minimap, and off-screen markers — `enhancement` `godot` `android`
+16. #59 Android performance verification and documentation — `android` `documentation`
 
 ## Testing strategy
 

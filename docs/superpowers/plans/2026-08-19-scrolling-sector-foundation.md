@@ -4,13 +4,13 @@
 
 **Goal:** Deliver the scrolling foundation — a large bounded sector, a follow camera, soft edges that contain every entity, and parallax depth — so the game visibly scrolls with the ship.
 
-**Scope:** This plan covers child issues 1-4 of the scrolling sector epic. The
+**Scope:** This plan covers child issues #44, #45, #46, and #47 of epic #43. The
 epic's remaining twelve issues are independent subsystems that build on this
 foundation and get their own plans once it lands:
 
-- `2026-08-19-scrolling-sector-content.md` — issues 5-9: asteroid fields, activation, asset families, planets and moons, gravity.
-- `2026-08-19-scrolling-sector-loop.md` — issues 10-14: hull/fuel/credits, stations and docking, AI ships, threat escalation.
-- `2026-08-19-scrolling-sector-navigation.md` — issues 15-16: sector map, Android performance verification and docs.
+- `2026-08-19-scrolling-sector-content.md` — issues #48-#52: asteroid fields, activation, asset families, planets and moons, gravity.
+- `2026-08-19-scrolling-sector-loop.md` — issues #53-#57: hull/fuel/credits, stations and docking, AI ships, threat escalation.
+- `2026-08-19-scrolling-sector-navigation.md` — issues #58-#59: sector map, Android performance verification and docs.
 
 Each plan produces working, testable software on its own.
 
@@ -86,7 +86,7 @@ Each plan produces working, testable software on its own.
 
 ---
 
-### Task 1: Sector definition and world-bounds authority
+### Task 1 (#44): Sector definition and world-bounds authority
 
 Pure refactor. Behavior after this task is byte-for-byte identical to before: the
 default sector is exactly viewport-sized and entities still wrap. Only the
@@ -544,7 +544,7 @@ git commit -m "Add sector definition and world-bounds authority"
 
 ---
 
-### Task 2: Follow camera with sector limits and look-ahead
+### Task 2 (#45): Follow camera with sector limits and look-ahead
 
 This is the task where scrolling becomes visible. The sector grows to 8000x6000
 and a camera follows the ship.
@@ -828,7 +828,7 @@ git commit -m "Add follow camera with sector limits and look-ahead"
 
 ---
 
-### Task 3: Soft sector boundary and containment
+### Task 3 (#46): Soft sector boundary and containment
 
 Replace wrapping with containment. The ship is pushed back, asteroids and AI
 ships reflect, bullets despawn.
@@ -1157,7 +1157,7 @@ git commit -m "Replace screen wrapping with soft sector boundary containment"
 
 ---
 
-### Task 4: Parallax star layers and deep-space background
+### Task 4 (#47): Parallax star layers and deep-space background
 
 Removes the fixed-size background left broken by Task 2 and gives the sector
 visible depth so scrolling reads as motion.
@@ -1460,4 +1460,4 @@ git commit -m "Replace fixed starfield with seeded parallax star layers"
 - The Android debug APK builds, installs, and runs.
 - `scripts/starfield.gd`, `Background`, `BackgroundTexture`, and `PlayArea` are gone.
 
-Once these hold, write `2026-08-19-scrolling-sector-content.md` for issues 5-9.
+Once these hold, write `2026-08-19-scrolling-sector-content.md` for issues #48-#52.

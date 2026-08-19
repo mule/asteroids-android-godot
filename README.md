@@ -82,6 +82,7 @@ Planning lives in GitHub issues:
 
 - [Epic: Build a playable Asteroids Android practice game in Godot](https://github.com/mule/asteroids-android-godot/issues/11)
 - [Epic: Build a reproducible AI-assisted game asset pipeline](https://github.com/mule/asteroids-android-godot/issues/22)
+- [Epic: Scroll the game across a large sector with fields, bodies, stations, and ships](https://github.com/mule/asteroids-android-godot/issues/43)
 - [Open task list](https://github.com/mule/asteroids-android-godot/issues)
 
 Asset pipeline conventions live in:
