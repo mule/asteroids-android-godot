@@ -14,7 +14,7 @@ func _init() -> void:
 	await _test_look_ahead_moves_the_camera_while_flying(failures)
 	await _test_retarget_clears_the_previous_look_ahead(failures)
 	await _test_view_never_leaves_the_sector(failures)
-	await _test_a_wrapping_ship_stays_on_screen(failures)
+	await _test_a_teleported_ship_stays_on_screen(failures)
 
 	for failure in failures:
 		printerr("FAIL: ", failure)
@@ -224,11 +224,11 @@ func _test_view_never_leaves_the_sector(failures: Array[String]) -> void:
 	await physics_frame
 
 
-func _test_a_wrapping_ship_stays_on_screen(failures: Array[String]) -> void:
-	# player_ship wraps at the sector edge until #46 replaces wrapping with
-	# containment, and a wrap moves the ship the full width of the world in one
-	# frame. Smoothing across that pans the view over the whole sector for about
-	# a second with the ship off-screen the entire way. The camera has to cut.
+func _test_a_teleported_ship_stays_on_screen(failures: Array[String]) -> void:
+	# Nothing wraps since #46, but the camera still has to survive a target that
+	# jumps the width of the world in one frame without going through
+	# set_target(). Smoothing across that pans the view over the whole sector
+	# for about a second with the ship off-screen the entire way. Cut instead.
 	var camera := _make_camera()
 	var target := Mover.new()
 	root.add_child(camera)
@@ -245,7 +245,7 @@ func _test_a_wrapping_ship_stays_on_screen(failures: Array[String]) -> void:
 	for _step in 30:
 		await physics_frame
 
-	# The wrap itself: the far right edge becomes the far left edge.
+	# The teleport itself: the far right edge becomes the far left edge.
 	target.global_position = Vector2(bounds.position.x + 40.0, bounds.get_center().y)
 	await physics_frame
 
@@ -253,7 +253,7 @@ func _test_a_wrapping_ship_stays_on_screen(failures: Array[String]) -> void:
 	var view := Rect2(camera.get_screen_center_position() - half_view, half_view * 2.0)
 	if not view.has_point(target.global_position):
 		failures.append(
-			"Wrap: ship at %s must still be on screen the frame after wrapping, view %s"
+			"Teleport: ship at %s must still be on screen the frame after it moves, view %s"
 			% [target.global_position, view]
 		)
 

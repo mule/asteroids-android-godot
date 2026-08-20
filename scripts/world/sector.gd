@@ -14,7 +14,7 @@ func get_bounds() -> Rect2:
 	# The sector may never be smaller than what the player can see.
 	# project.godot stretches with aspect "expand", so the visible rect grows
 	# past the 1152x648 base on any other aspect ratio -- 1440x648 on a 20:9
-	# phone. Without this the default viewport-sized sector would wrap entities
+	# phone. Without this the default viewport-sized sector would stop entities
 	# in the middle of the screen instead of at its edge, which is exactly the
 	# behaviour change #44 must not introduce.
 	#

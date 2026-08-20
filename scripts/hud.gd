@@ -21,6 +21,7 @@ signal touch_action_changed(action: StringName, pressed: bool)
 @onready var touch_right_button: Button = $Root/TouchControls/LeftCluster/RotateRightButton
 @onready var touch_thrust_button: Button = $Root/TouchControls/RightCluster/ThrustButton
 @onready var touch_shoot_button: Button = $Root/TouchControls/RightCluster/ShootButton
+@onready var boundary_warning: Label = $Root/BoundaryWarning
 
 var current_score: int = 0
 var current_wave: int = 1
@@ -78,6 +79,10 @@ func hide_status() -> void:
 
 func set_pause_available(value: bool) -> void:
 	pause_button.disabled = not value
+
+
+func set_boundary_warning(active: bool) -> void:
+	boundary_warning.visible = active
 
 
 func set_touch_controls_visible(value: bool) -> void:

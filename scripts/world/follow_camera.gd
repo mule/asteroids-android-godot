@@ -62,14 +62,15 @@ func _physics_process(delta: float) -> void:
 	if target == null or not is_instance_valid(target):
 		return
 
-	# The ship still wraps at the sector edge until #46 replaces wrapping with
-	# containment, and a wrap moves it the full width of the world in one frame.
-	# position_smoothing_enabled would interpolate across that, panning the view
-	# over the entire sector for about a second with the ship off-screen the
-	# whole way -- the player flies blind and can be killed without seeing what
-	# hit them. Cut instead. Velocity is unchanged by a wrap, so the look-ahead
-	# is already correct and is deliberately kept: clearing it here would make
-	# the lead pop back in over the next third of a second.
+	# Nothing wraps since #46, so the routine sector-edge teleport this guard
+	# was written for is gone; it stays as the safety net for any other
+	# single-frame jump of the target that does not come through set_target().
+	# position_smoothing_enabled would interpolate across such a jump, panning
+	# the view over the entire sector for about a second with the ship
+	# off-screen the whole way -- the player flies blind and can be killed
+	# without seeing what hit them. Cut instead. The look-ahead is deliberately
+	# kept rather than cleared: clearing it here would make the lead pop back in
+	# over the next third of a second.
 	var teleported := _target_teleported()
 
 	var target_velocity: Vector2 = Vector2.ZERO

@@ -9,7 +9,6 @@ const GAME_SCENE := "res://scenes/game/Game.tscn"
 func _init() -> void:
 	var failures: Array[String] = []
 
-	_test_wrap_matches_legacy_behavior(failures)
 	_test_clamp_keeps_position_inside(failures)
 	_test_is_outside_respects_radius(failures)
 	_test_reflect_only_when_moving_outward(failures)
@@ -27,26 +26,6 @@ func _init() -> void:
 	else:
 		printerr("FAILED %d TESTS" % failures.size())
 		quit(1)
-
-
-func _test_wrap_matches_legacy_behavior(failures: Array[String]) -> void:
-	var bounds := Rect2(Vector2.ZERO, Vector2(1152.0, 648.0))
-	var margin := 32.0
-
-	# Exiting the left edge reappears at the right, exactly as the old
-	# _wrap_to_visible_viewport did.
-	var wrapped := WORLD_BOUNDS.wrap_to_bounds(Vector2(-40.0, 300.0), bounds, margin)
-	if not is_equal_approx(wrapped.x, 1184.0):
-		failures.append("Wrap: expected x 1184.0 crossing left edge, got %f" % wrapped.x)
-
-	wrapped = WORLD_BOUNDS.wrap_to_bounds(Vector2(1200.0, 300.0), bounds, margin)
-	if not is_equal_approx(wrapped.x, -32.0):
-		failures.append("Wrap: expected x -32.0 crossing right edge, got %f" % wrapped.x)
-
-	# A position well inside is untouched.
-	var inside := Vector2(500.0, 300.0)
-	if WORLD_BOUNDS.wrap_to_bounds(inside, bounds, margin) != inside:
-		failures.append("Wrap: interior position must not move")
 
 
 func _test_clamp_keeps_position_inside(failures: Array[String]) -> void:
@@ -117,7 +96,7 @@ func _test_sector_is_never_smaller_than_the_viewport(failures: Array[String]) ->
 	# project.godot stretches with aspect "expand", so the visible rect is only
 	# 1152x648 at exactly 16:9 and grows on every other window shape. The
 	# sector must cover the visible rect however large the window grows, or
-	# entities wrap in the middle of the screen. See scripts/world/sector.gd.
+	# entities stop in the middle of the screen. See scripts/world/sector.gd.
 	var sector := Sector.new()
 	if sector == null:
 		# A parse error in sector.gd makes .new() return null. Without this the
@@ -146,9 +125,9 @@ func _test_sector_is_never_smaller_than_the_viewport(failures: Array[String]) ->
 
 func _test_entities_track_a_viewport_resize(failures: Array[String]) -> void:
 	# Before #44 every entity re-read get_viewport_rect() each physics frame, so
-	# wrapping followed a window resize for free. Bounds are now handed out once
-	# at spawn, so game.gd has to re-push them or the ship keeps wrapping
-	# against the size the window had when it was created.
+	# the world edge followed a window resize for free. Bounds are now handed
+	# out once at spawn, so game.gd has to re-push them or the ship keeps being
+	# contained against the size the window had when it was created.
 	var game := (load(GAME_SCENE) as PackedScene).instantiate()
 	root.add_child(game)
 	await process_frame
