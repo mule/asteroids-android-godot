@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SectorDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/sector_definition.gd" id="1_sector"]
+
+[resource]
+script = ExtResource("1_sector")
+sector_name = &"vega_7"
+world_size = Vector2(1152, 648)
+sector_seed = 1729
+boundary_margin = 600.0
+asteroid_field_count = 5
+planet_count = 2
+moon_count = 3
+station_count = 1
+min_landmark_separation = 900.0

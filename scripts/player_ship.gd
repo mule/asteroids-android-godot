@@ -2,6 +2,7 @@ extends Area2D
 
 
 const MATERIAL_RUNTIME := preload("res://scripts/material_runtime.gd")
+const WORLD_BOUNDS := preload("res://scripts/world/world_bounds.gd")
 
 signal shoot_requested(muzzle_position: Vector2, direction: Vector2, inherited_velocity: Vector2)
 
@@ -28,6 +29,7 @@ var invulnerable: bool = false
 var world_light_direction: Vector2 = Vector2(-0.55, -0.83).normalized()
 var ship_material: ShaderMaterial
 var thrust_material: ShaderMaterial
+var sector_bounds: Rect2 = Rect2()
 
 
 func _ready() -> void:
@@ -106,20 +108,19 @@ func _move(delta: float) -> void:
 	position += velocity * delta
 
 
+func set_sector_bounds(bounds: Rect2) -> void:
+	sector_bounds = bounds
+
+
+func _get_sector_bounds() -> Rect2:
+	if sector_bounds.size.x > 0.0 and sector_bounds.size.y > 0.0:
+		return sector_bounds
+
+	return get_viewport_rect()
+
+
 func _wrap_to_visible_viewport() -> void:
-	var viewport_rect := get_viewport_rect()
-	var min_position := viewport_rect.position - Vector2.ONE * wrap_margin
-	var max_position := viewport_rect.position + viewport_rect.size + Vector2.ONE * wrap_margin
-
-	if position.x < min_position.x:
-		position.x = max_position.x
-	elif position.x > max_position.x:
-		position.x = min_position.x
-
-	if position.y < min_position.y:
-		position.y = max_position.y
-	elif position.y > max_position.y:
-		position.y = min_position.y
+	position = WORLD_BOUNDS.wrap_to_bounds(position, _get_sector_bounds(), wrap_margin)
 
 
 func reset_for_respawn(spawn_position: Vector2) -> void:

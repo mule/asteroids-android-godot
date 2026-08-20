@@ -23,6 +23,7 @@ const ASTEROID_SMALL := 2
 
 @onready var entities: Node2D = $Entities
 @onready var player_ship: Area2D = $Entities/PlayerShip
+@onready var sector: Sector = $Sector
 @onready var player_input: Node = $PlayerInput
 @onready var feedback: Node = $Feedback
 @onready var hud: CanvasLayer = $Hud
@@ -45,6 +46,10 @@ func _ready() -> void:
 	hud.resume_requested.connect(_resume_game)
 	hud.restart_requested.connect(_start_new_game)
 	hud.touch_action_changed.connect(_on_hud_touch_action_changed)
+	# The sector is at least viewport-sized, so a resize changes where the world
+	# ends. Entities are handed their bounds once at spawn, so without this they
+	# would keep wrapping against the size the window had when they appeared.
+	get_viewport().size_changed.connect(_apply_sector_bounds_to_entities)
 	_apply_lighting_to_entity(player_ship)
 	if auto_start:
 		_start_new_game()
@@ -188,7 +193,7 @@ func _begin_respawn() -> void:
 
 
 func _respawn_player(use_invulnerability_timer: bool) -> void:
-	player_ship.reset_for_respawn(get_viewport_rect().get_center())
+	player_ship.reset_for_respawn(sector.get_center())
 	player_ship.set_controls_enabled(true)
 	player_ship.set_invulnerable(use_invulnerability_timer)
 	feedback.spawn_respawn_ring(player_ship.global_position)
@@ -292,19 +297,26 @@ func _apply_lighting_to_entity(entity: Node) -> void:
 	if entity.has_method("set_shader_lighting_enabled"):
 		entity.set_shader_lighting_enabled(shader_lighting_enabled)
 
+	_apply_sector_bounds_to_entity(entity)
+
+
+func _apply_sector_bounds_to_entities() -> void:
+	for entity in entities.get_children():
+		_apply_sector_bounds_to_entity(entity)
+
+
+func _apply_sector_bounds_to_entity(entity: Node) -> void:
+	if entity != null and entity.has_method("set_sector_bounds"):
+		entity.set_sector_bounds(sector.get_bounds())
+
 
 func _on_hud_touch_action_changed(action: StringName, pressed: bool) -> void:
 	player_input.set_touch_action(action, pressed)
 
 
 func _get_safe_spawn_position(index: int, asteroid_count: int) -> Vector2:
-	var viewport_rect := get_viewport_rect()
-
 	for attempt in 32:
-		var spawn_position := Vector2(
-			random.randf_range(viewport_rect.position.x, viewport_rect.end.x),
-			random.randf_range(viewport_rect.position.y, viewport_rect.end.y)
-		)
+		var spawn_position := sector.get_random_position(random)
 
 		if spawn_position.distance_to(player_ship.global_position) >= spawn_safe_radius:
 			return spawn_position

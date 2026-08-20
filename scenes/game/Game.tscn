@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3 uid="uid://bqsky4x01tinn"]
+[gd_scene load_steps=22 format=3 uid="uid://bqsky4x01tinn"]
 
 [ext_resource type="Script" path="res://scripts/game.gd" id="1_m6aai"]
 [ext_resource type="PackedScene" path="res://scenes/entities/PlayerShip.tscn" id="2_mgmqj"]
@@ -18,6 +18,8 @@
 [ext_resource type="Texture2D" path="res://assets/media/effects/effect_impact_flash_01.png" id="16_xask5"]
 [ext_resource type="AudioStream" path="res://assets/audio/sfx_shot_spark_01.wav" id="17_y3v2k"]
 [ext_resource type="AudioStream" path="res://assets/audio/sfx_impact_thump_01.wav" id="18_87qfr"]
+[ext_resource type="Script" path="res://scripts/world/sector.gd" id="19_c1u4a"]
+[ext_resource type="Resource" path="res://assets/sectors/sector_default.tres" id="20_4w721"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_xh3dq"]
 size = Vector2(1152, 648)
@@ -52,6 +54,10 @@ collision_mask = 0
 position = Vector2(576, 324)
 shape = SubResource("RectangleShape2D_xh3dq")
 debug_color = Color(0.2, 0.7, 1, 0.15)
+
+[node name="Sector" type="Node2D" parent="."]
+script = ExtResource("19_c1u4a")
+definition = ExtResource("20_4w721")
 
 [node name="Entities" type="Node2D" parent="."]
 process_mode = 1
