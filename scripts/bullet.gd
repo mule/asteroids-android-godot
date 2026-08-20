@@ -8,7 +8,6 @@ const WORLD_BOUNDS := preload("res://scripts/world/world_bounds.gd")
 @export var shader_lighting_enabled: bool = true
 @export var speed: float = 760.0
 @export var lifetime_seconds: float = 1.2
-@export var wrap_margin: float = 8.0
 
 @onready var bullet_shape: Polygon2D = $BulletShape
 
@@ -32,7 +31,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	position += velocity * delta
-	_wrap_to_visible_viewport()
+	_despawn_outside_sector()
 
 
 func launch(direction: Vector2, inherited_velocity: Vector2 = Vector2.ZERO) -> void:
@@ -66,8 +65,9 @@ func _get_sector_bounds() -> Rect2:
 	return get_viewport_rect()
 
 
-func _wrap_to_visible_viewport() -> void:
-	position = WORLD_BOUNDS.wrap_to_bounds(position, _get_sector_bounds(), wrap_margin)
+func _despawn_outside_sector() -> void:
+	if WORLD_BOUNDS.is_outside(position, _get_sector_bounds(), 0.0):
+		queue_free()
 
 
 func _apply_visual_asset() -> void:

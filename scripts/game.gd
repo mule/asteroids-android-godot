@@ -43,6 +43,7 @@ func _ready() -> void:
 	world_light_direction = world_light_direction.normalized()
 	player_ship.shoot_requested.connect(_on_player_ship_shoot_requested)
 	player_ship.area_entered.connect(_on_player_ship_area_entered)
+	player_ship.boundary_warning_changed.connect(hud.set_boundary_warning)
 	hud.pause_requested.connect(_pause_game)
 	hud.resume_requested.connect(_resume_game)
 	hud.restart_requested.connect(_start_new_game)
@@ -321,8 +322,14 @@ func _apply_sector_bounds_to_entities() -> void:
 
 
 func _apply_sector_bounds_to_entity(entity: Node) -> void:
-	if entity != null and entity.has_method("set_sector_bounds"):
+	if entity == null:
+		return
+
+	if entity.has_method("set_sector_bounds"):
 		entity.set_sector_bounds(sector.get_bounds())
+
+	if entity.has_method("set_boundary_margin"):
+		entity.set_boundary_margin(sector.get_boundary_margin())
 
 
 func _on_hud_touch_action_changed(action: StringName, pressed: bool) -> void:

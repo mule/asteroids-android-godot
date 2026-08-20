@@ -5,6 +5,7 @@ const MATERIAL_RUNTIME := preload("res://scripts/material_runtime.gd")
 const WORLD_BOUNDS := preload("res://scripts/world/world_bounds.gd")
 
 signal shoot_requested(muzzle_position: Vector2, direction: Vector2, inherited_velocity: Vector2)
+signal boundary_warning_changed(active: bool)
 
 @export var visual_asset: Resource = preload("res://assets/generated/ships/ship_delta_01.tres")
 @export var shader_lighting_enabled: bool = true
@@ -12,7 +13,7 @@ signal shoot_requested(muzzle_position: Vector2, direction: Vector2, inherited_v
 @export var max_speed: float = 520.0
 @export var turn_speed_degrees: float = 180.0
 @export var linear_drag: float = 12.0
-@export var wrap_margin: float = 32.0
+@export var boundary_push_multiplier: float = 1.5
 @export var fire_cooldown_seconds: float = 0.18
 @export var muzzle_distance: float = 34.0
 @export var input_source_path: NodePath = ^"../../PlayerInput"
@@ -30,6 +31,8 @@ var world_light_direction: Vector2 = Vector2(-0.55, -0.83).normalized()
 var ship_material: ShaderMaterial
 var thrust_material: ShaderMaterial
 var sector_bounds: Rect2 = Rect2()
+var boundary_margin: float = 600.0
+var boundary_warning_active: bool = false
 
 
 func _ready() -> void:
@@ -39,6 +42,9 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	if not controls_enabled:
+		_apply_drift(delta)
+		_move(delta)
+		_contain_in_sector(delta)
 		return
 
 	_update_fire_cooldown(delta)
@@ -47,7 +53,7 @@ func _physics_process(delta: float) -> void:
 	_apply_shoot_input()
 	_apply_drift(delta)
 	_move(delta)
-	_wrap_to_visible_viewport()
+	_contain_in_sector(delta)
 	_update_shader_light_direction()
 
 
@@ -112,6 +118,10 @@ func set_sector_bounds(bounds: Rect2) -> void:
 	sector_bounds = bounds
 
 
+func set_boundary_margin(value: float) -> void:
+	boundary_margin = value
+
+
 func _get_sector_bounds() -> Rect2:
 	if sector_bounds.size.x > 0.0 and sector_bounds.size.y > 0.0:
 		return sector_bounds
@@ -119,8 +129,19 @@ func _get_sector_bounds() -> Rect2:
 	return get_viewport_rect()
 
 
-func _wrap_to_visible_viewport() -> void:
-	position = WORLD_BOUNDS.wrap_to_bounds(position, _get_sector_bounds(), wrap_margin)
+func _contain_in_sector(delta: float) -> void:
+	var bounds := _get_sector_bounds()
+	var pressure := WORLD_BOUNDS.edge_pressure(position, bounds, boundary_margin)
+
+	if pressure != Vector2.ZERO:
+		velocity += pressure * acceleration * boundary_push_multiplier * delta
+
+	position = WORLD_BOUNDS.clamp_to_sector(position, bounds, 0.0)
+
+	var warning := pressure != Vector2.ZERO
+	if warning != boundary_warning_active:
+		boundary_warning_active = warning
+		boundary_warning_changed.emit(warning)
 
 
 func reset_for_respawn(spawn_position: Vector2) -> void:
@@ -129,6 +150,9 @@ func reset_for_respawn(spawn_position: Vector2) -> void:
 	velocity = Vector2.ZERO
 	fire_cooldown_remaining = 0.0
 	thrust_flame.visible = false
+	if boundary_warning_active:
+		boundary_warning_active = false
+		boundary_warning_changed.emit(false)
 
 
 func set_controls_enabled(value: bool) -> void:

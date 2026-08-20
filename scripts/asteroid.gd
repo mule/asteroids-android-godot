@@ -17,7 +17,6 @@ enum AsteroidSize {
 @export_enum("Large", "Medium", "Small") var size_tier: int = AsteroidSize.LARGE
 @export var drift_speed: float = 90.0
 @export var rotation_speed_degrees: float = 25.0
-@export var wrap_margin: float = 48.0
 @export var bounce_restitution: float = 1.0
 
 @onready var rock_shape: Polygon2D = $RockShape
@@ -40,7 +39,7 @@ func _physics_process(delta: float) -> void:
 	_limit_velocity_for_discrete_collision(delta)
 	position += velocity * delta
 	rotation += deg_to_rad(rotation_speed_degrees) * delta
-	_wrap_to_visible_viewport()
+	_contain_in_sector()
 	_update_shader_light_direction()
 	_resolve_asteroid_overlaps()
 
@@ -195,9 +194,9 @@ func _resolve_asteroid_collision(other: Area2D) -> void:
 	var separation_b := normal * (overlap * (mass_a / total_mass))
 	global_position += separation_a
 	other.global_position -= separation_b
-	_wrap_to_visible_viewport()
-	if other.has_method("_wrap_to_visible_viewport"):
-		other._wrap_to_visible_viewport()
+	_contain_in_sector()
+	if other.has_method("_contain_in_sector"):
+		other._contain_in_sector()
 
 	# Calculate velocity response (elastic bounce)
 	var vel_b: Vector2 = other.get("velocity") if other.get("velocity") != null else Vector2.ZERO
@@ -238,8 +237,11 @@ func _get_sector_bounds() -> Rect2:
 	return get_viewport_rect()
 
 
-func _wrap_to_visible_viewport() -> void:
-	position = WORLD_BOUNDS.wrap_to_bounds(position, _get_sector_bounds(), wrap_margin)
+func _contain_in_sector() -> void:
+	var bounds := _get_sector_bounds()
+	var radius := get_collision_radius()
+	velocity = WORLD_BOUNDS.reflect_velocity_at_edge(position, velocity, bounds, radius)
+	position = WORLD_BOUNDS.clamp_to_sector(position, bounds, radius)
 
 
 func _update_shader_light_direction() -> void:
