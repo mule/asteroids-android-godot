@@ -47,7 +47,16 @@ has_label() { grep -qE "(^|,)$1(,|\$)" <<<"$labels"; }
 # `review-passed` label survives a later push; this ref does not, so a PR that
 # grows new commits after its review stops clearing the gate and falls back
 # into the claimable queue instead of merging on a stale label.
-reviewed_sha=$(gh api "repos/$SLUG/git/ref/${PASS_PREFIX}${pr}" -q .object.sha 2>/dev/null || echo "")
+reviewed_sha=$(gh api "repos/$SLUG/git/ref/${PASS_PREFIX}${pr}" -q .object.sha 2>/dev/null || true)
+
+# A missing ref does not answer with an empty string: gh writes the 404 body to
+# stdout, `-q` does not filter an error response, and `|| echo ""` appends to it
+# rather than replacing it. Left alone, $reviewed_sha becomes
+# `{"message":"Not Found",...}` and the gate reports "reviewed at {"messa".
+# It still refuses to merge, since that can never equal a head sha, but it
+# refuses for a reason it cannot explain. Anything that is not a sha is "no
+# review recorded", which is what a 404 actually means.
+grep -qE '^[0-9a-f]{40}$' <<<"$reviewed_sha" || reviewed_sha=""
 
 # --- merge policy -----------------------------------------------------------
 # A clean agent review of the current head is the gate. Everything else below
