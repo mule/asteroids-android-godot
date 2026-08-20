@@ -6,12 +6,15 @@
 # The reviewer agent MUST call this and honour its exit code:
 #   exit 0 -> merge
 #   exit 1 -> hold: something is wrong, label review-blocked, a human must look
-#   exit 2 -> clean, only missing a sign-off: label review-passed and walk away
+#   exit 2 -> not cleared at this sha: it belongs in the review queue, not here
 #
 # Facts available to you (all already fetched below):
 #   $pr             PR number
 #   $checks         "pass" | "fail" | "pending" | "none"
 #   $approvals      number of human APPROVED reviews
+#   $reviewed_sha   head sha a reviewer cleared, "" if it never cleared one
+#   $head_sha       head sha the PR is at right now
+#   $merge_state    GitHub's mergeStateStatus (CLEAN, DIRTY, BLOCKED, ...)
 #   $changed_files  number of files touched
 #   $additions      lines added
 #   $author         PR author login
@@ -19,8 +22,12 @@ set -euo pipefail
 pr="$1"
 SLUG="${REVIEW_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}"
 
-read -r author changed_files additions <<<"$(gh pr view "$pr" --repo "$SLUG" \
-  --json author,changedFiles,additions -q '"\(.author.login) \(.changedFiles) \(.additions)"')"
+# Must match PASS_PREFIX in lease.sh — `lease.sh mark-passed` writes this ref.
+PASS_PREFIX="reviewer-passed/pr-"
+
+read -r author changed_files additions head_sha merge_state <<<"$(gh pr view "$pr" --repo "$SLUG" \
+  --json author,changedFiles,additions,headRefOid,mergeStateStatus \
+  -q '"\(.author.login) \(.changedFiles) \(.additions) \(.headRefOid) \(.mergeStateStatus)"')"
 
 rollup=$(gh pr view "$pr" --repo "$SLUG" --json statusCheckRollup \
   -q '[.statusCheckRollup[]?.conclusion // .statusCheckRollup[]?.state] | @csv' 2>/dev/null || echo "")
@@ -32,17 +39,19 @@ else                                              checks="pass"; fi
 approvals=$(gh pr view "$pr" --repo "$SLUG" --json reviews \
   -q '[.reviews[] | select(.state=="APPROVED")] | length')
 
-# GitHub refuses to let an account approve its own PR, and the agents open PRs
-# as the same account that reviews them. On a single-identity repo a real
-# APPROVED review is therefore unobtainable, so an explicit `approved` label
-# counts as the sign-off. Add a second identity for the PRs (a bot account or
-# GitHub App) and the review path above starts working on its own.
-signoff=$(gh pr view "$pr" --repo "$SLUG" --json labels \
-  -q 'if ([.labels[].name] | index("approved")) then "yes" else "no" end')
+labels=$(gh pr view "$pr" --repo "$SLUG" --json labels -q '[.labels[].name] | join(",")')
+has_label() { grep -qE "(^|,)$1(,|\$)" <<<"$labels"; }
+
+# The sign-off: a reviewer agent recorded a clean review at one exact head sha
+# via `lease.sh mark-passed`. Pinning to the sha is the whole point. The
+# `review-passed` label survives a later push; this ref does not, so a PR that
+# grows new commits after its review stops clearing the gate and falls back
+# into the claimable queue instead of merging on a stale label.
+reviewed_sha=$(gh api "repos/$SLUG/git/ref/${PASS_PREFIX}${pr}" -q .object.sha 2>/dev/null || echo "")
 
 # --- merge policy -----------------------------------------------------------
-# A human approval is the gate. Everything else is a guard against merging
-# something demonstrably broken on top of that approval.
+# A clean agent review of the current head is the gate. Everything else below
+# is a guard against merging something demonstrably broken on top of it.
 
 # Red or still-running checks veto the merge outright. "none" is allowed
 # through: this repo has no CI yet, and blocking on absent checks would mean
@@ -51,12 +60,39 @@ case "$checks" in
   fail|pending) echo "gate: checks=$checks -> hold #$pr" >&2; exit 1 ;;
 esac
 
-# The actual policy: one human APPROVED review. The reviewer agent fixed its
-# own findings on this branch, so it cannot also be the thing that clears it.
-if [ "$approvals" -lt 1 ] && [ "$signoff" != "yes" ]; then
-  echo "gate: no approval and no \`approved\` label -> #$pr awaits sign-off" >&2
+# review-blocked means a human still owes an answer. `lease.sh mergeable`
+# already filters these out, but this is the irreversible step, so it re-checks
+# rather than trusting its caller to have done it.
+if has_label review-blocked; then
+  echo "gate: review-blocked -> hold #$pr" >&2
+  exit 1
+fi
+
+# A PR that no longer merges cleanly is not a merge decision, it is a
+# reconciliation decision: someone has to choose whose version of the
+# conflicting code survives, and that choice is not reviewed work.
+case "$merge_state" in
+  DIRTY|BEHIND)
+    echo "gate: mergeStateStatus=$merge_state -> #$pr conflicts with the base, needs a rebase and a fresh review" >&2
+    exit 1 ;;
+esac
+
+# The actual policy: a reviewer agent cleared *this* sha. A human APPROVED
+# review or the `approved` label still clear the gate too, so a person can
+# always sign off on something the pool would not pass by itself.
+if [ -n "$reviewed_sha" ] && [ "$reviewed_sha" = "$head_sha" ]; then
+  signoff="agent-review@${head_sha:0:7}"
+elif [ "$approvals" -ge 1 ]; then
+  signoff="human-approval"
+elif has_label approved; then
+  signoff="approved-label"
+elif [ -n "$reviewed_sha" ]; then
+  echo "gate: reviewed at ${reviewed_sha:0:7} but head is now ${head_sha:0:7} -> #$pr needs a re-review" >&2
+  exit 2
+else
+  echo "gate: no clean review recorded -> #$pr awaits review" >&2
   exit 2
 fi
 
-echo "gate: checks=$checks approvals=$approvals signoff=$signoff -> merge #$pr" >&2
+echo "gate: checks=$checks signoff=$signoff -> merge #$pr" >&2
 exit 0
