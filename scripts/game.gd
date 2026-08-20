@@ -24,6 +24,7 @@ const ASTEROID_SMALL := 2
 @onready var entities: Node2D = $Entities
 @onready var player_ship: Area2D = $Entities/PlayerShip
 @onready var sector: Sector = $Sector
+@onready var follow_camera: Camera2D = $FollowCamera
 @onready var player_input: Node = $PlayerInput
 @onready var feedback: Node = $Feedback
 @onready var hud: CanvasLayer = $Hud
@@ -51,6 +52,8 @@ func _ready() -> void:
 	# would keep wrapping against the size the window had when they appeared.
 	get_viewport().size_changed.connect(_apply_sector_bounds_to_entities)
 	_apply_lighting_to_entity(player_ship)
+	follow_camera.apply_sector_limits(sector.get_bounds())
+	follow_camera.set_target(player_ship)
 	if auto_start:
 		_start_new_game()
 
@@ -196,6 +199,7 @@ func _respawn_player(use_invulnerability_timer: bool) -> void:
 	player_ship.reset_for_respawn(sector.get_center())
 	player_ship.set_controls_enabled(true)
 	player_ship.set_invulnerable(use_invulnerability_timer)
+	follow_camera.set_target(player_ship)
 	feedback.spawn_respawn_ring(player_ship.global_position)
 	respawning = false
 
