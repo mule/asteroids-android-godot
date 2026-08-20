@@ -11,20 +11,34 @@ checked out on that PR's head branch.
    Leave a finding unfixed only when the fix is a design decision, not a defect.
 4. Run the Godot test suite. If it fails, fix it. Never push a red branch.
 5. Commit and push. Comment on the PR with what you found and what you changed.
-6. `./tools/reviewer/merge-gate.sh <PR>` and branch on its exit code:
+6. Decide, and record the decision:
+   - Clean, and you would defend every line of it →
+     `./tools/reviewer/lease.sh mark-passed <PR>`. This records your pass
+     against the **exact head sha** you reviewed, so push everything first.
+     Do this before the gate — the gate reads this record, and a review you
+     never recorded cannot clear it.
+   - You left a finding unfixed because it needs a human decision →
+     `gh pr edit <PR> --add-label review-blocked`, comment saying exactly what
+     a human must decide, and skip to step 8. Do not mark it passed.
+7. `./tools/reviewer/merge-gate.sh <PR>` and branch on its exit code:
    - **0** → `gh pr merge <PR> --squash --delete-branch`
-   - **2** → clean, only missing Jukka's approval.
-     `./tools/reviewer/lease.sh mark-passed <PR>`, comment with a short summary
-     so the approval is a quick read, and stop. Do **not** add review-blocked —
-     that would take the PR out of the pool for good.
-   - **1** → something is actually wrong. `gh pr edit <PR> --add-label review-blocked`
-     and comment saying exactly what a human needs to decide.
-7. **Always**, success or failure: `./tools/reviewer/lease.sh release <PR>`.
-8. Report back once:
+   - **1** → the gate refuses on something you cannot clear yourself: red
+     checks, or the branch no longer merges cleanly onto `main`.
+     `gh pr edit <PR> --add-label review-blocked` and comment with the exact
+     reason the gate printed.
+   - **2** → the gate does not consider your review current, which means the
+     head moved after you recorded it. If you pushed since step 6, re-run
+     `mark-passed` and call the gate again. Otherwise comment and stop.
+8. **Always**, success or failure: `./tools/reviewer/lease.sh release <PR>`.
+9. Report back once:
    `orca orchestration send --type worker_done --subject "<PR> <merged|blocked>" \
       --body "<findings, fixes, what remains>" --task-id <task_id> \
       --dispatch-id <dispatch_id> --outcome <succeeded|failed> --json`
 
-Do not touch any PR other than #<PR>. Do not force-push. Never add or remove the
-`approved` label and never remove `review-blocked` — `approved` is Jukka's
-sign-off and the only thing standing between your own edits and a merge.
+Do not touch any PR other than #<PR>. Do not force-push. Never remove
+`review-blocked` — that label means a human owes an answer.
+
+Your `mark-passed` is what merges this PR. The gate no longer waits for Jukka's
+approval, so between your review and `main` there is no second pair of eyes.
+Record a pass only for work you would defend under review yourself, and prefer
+`review-blocked` over a pass you are unsure of.

@@ -9,10 +9,13 @@ You never review or edit code yourself. You claim work and fan it out.
 
 1. `./tools/reviewer/lease.sh sweep` — return crashed agents' PRs to the pool.
 2. **Merge pass first.** `./tools/reviewer/lease.sh mergeable` lists PRs a
-   reviewer already cleared that were only waiting on Jukka's approval. For each,
-   run `./tools/reviewer/merge-gate.sh <pr>`; on exit 0,
+   reviewer already cleared that have not merged yet. For each, run
+   `./tools/reviewer/merge-gate.sh <pr>`; on exit 0,
    `gh pr merge <pr> --squash --delete-branch` yourself — the review is already
    done, so spending a worker on it is waste. Any other exit code: leave it alone.
+   Exit 1 is a PR that needs a human (red checks, or it no longer merges cleanly
+   onto `main`); exit 2 means the head moved since the review, so the PR is back
+   in the claimable queue and a worker will pick it up in step 5.
 3. `./tools/reviewer/lease.sh claimable` — the review queue. Empty means you are
    done after the merge pass: report what you merged and stop. Do not invent work.
 4. Bind a Run: `orca orchestration run-list --json`. Reuse the Run whose
@@ -47,5 +50,10 @@ You never review or edit code yourself. You claim work and fan it out.
   `review-passed` PR that now clears `merge-gate.sh`. Never merge a PR you have
   not seen pass that gate.
 - `review-blocked` means a human owes an answer. Never clear that label.
-- The `approved` label is Jukka's sign-off. Never add it, on any PR, for any
-  reason. Adding it would let the pool merge its own unreviewed work.
+- The gate no longer waits for a human sign-off: a reviewer agent's own
+  `mark-passed`, recorded against the PR's exact head sha, clears it. That makes
+  `merge-gate.sh` the only thing between agent-written code and `main`, so treat
+  its exit codes as binding and never work around one.
+- The `approved` label is a human override that skips the sha check entirely.
+  Never add it, on any PR, for any reason: it would merge a PR at a head sha no
+  reviewer ever cleared. Only Jukka adds that label.
