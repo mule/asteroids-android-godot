@@ -11,6 +11,8 @@ func _init() -> void:
 	await _test_camera_tracks_target(failures)
 	await _test_look_ahead_leads_the_velocity(failures)
 	await _test_look_ahead_is_capped(failures)
+	await _test_look_ahead_moves_the_camera_while_flying(failures)
+	await _test_retarget_clears_the_previous_look_ahead(failures)
 
 	for failure in failures:
 		printerr("FAIL: ", failure)
@@ -21,6 +23,12 @@ func _init() -> void:
 	else:
 		printerr("FAILED %d TESTS" % failures.size())
 		quit(1)
+
+
+class Mover:
+	extends Node2D
+
+	var velocity: Vector2 = Vector2.ZERO
 
 
 func _make_camera() -> Camera2D:
@@ -100,4 +108,71 @@ func _test_look_ahead_is_capped(failures: Array[String]) -> void:
 		failures.append("Look-ahead: must be capped at max_look_ahead, got %f" % lead.length())
 
 	camera.queue_free()
+	await physics_frame
+
+
+func _test_look_ahead_moves_the_camera_while_flying(failures: Array[String]) -> void:
+	# A bare Node2D has no "velocity" property, so a target without one only ever
+	# exercises the zero-velocity shortcut in _physics_process. Use a target that
+	# actually carries velocity or the whole look-ahead path goes untested.
+	var camera := _make_camera()
+	var target := Mover.new()
+	root.add_child(camera)
+	root.add_child(target)
+	await physics_frame
+
+	camera.set_target(target)
+	target.velocity = Vector2(2000.0, 0.0)
+	target.global_position = Vector2(4000.0, 3000.0)
+
+	for _step in 60:
+		await physics_frame
+
+	var offset := camera.global_position - target.global_position
+	if offset.x <= 0.0:
+		failures.append("Look-ahead: camera must lead a rightward flight, offset %s" % offset)
+	if offset.length() > camera.max_look_ahead + 0.001:
+		failures.append("Look-ahead: camera lead %f exceeded the cap" % offset.length())
+
+	camera.queue_free()
+	target.queue_free()
+	await physics_frame
+
+
+func _test_retarget_clears_the_previous_look_ahead(failures: Array[String]) -> void:
+	# Respawning re-targets the camera so the view does not slide across the
+	# sector. reset_smoothing() only clears Camera2D's own state, so a look-ahead
+	# left over from the flight before death would teleport the camera back off
+	# the ship on the very next physics frame.
+	var camera := _make_camera()
+	var target := Mover.new()
+	root.add_child(camera)
+	root.add_child(target)
+	await physics_frame
+
+	camera.set_target(target)
+	target.velocity = Vector2(2000.0, 0.0)
+	target.global_position = Vector2(4000.0, 3000.0)
+
+	for _step in 60:
+		await physics_frame
+
+	# Respawn: the ship is placed at the sector centre with no velocity.
+	target.velocity = Vector2.ZERO
+	target.global_position = Vector2(4000.0, 3000.0)
+	camera.set_target(target)
+
+	if camera.global_position != target.global_position:
+		failures.append(
+			"Respawn: camera must snap onto the ship, got %s" % camera.global_position
+		)
+
+	await physics_frame
+
+	var drift := camera.global_position.distance_to(target.global_position)
+	if drift > 0.001:
+		failures.append("Respawn: camera drifted %f px off the ship after re-targeting" % drift)
+
+	camera.queue_free()
+	target.queue_free()
 	await physics_frame

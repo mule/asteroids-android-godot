@@ -49,6 +49,7 @@ script = ExtResource("19_c1u4a")
 definition = ExtResource("20_4w721")
 
 [node name="FollowCamera" type="Camera2D" parent="."]
+process_mode = 1
 script = ExtResource("21_camera")
 
 [node name="Entities" type="Node2D" parent="."]

@@ -27,6 +27,12 @@ func set_target(node: Node2D) -> void:
 	target = node
 
 	if target != null:
+		# Drop the look-ahead the previous target had built up before snapping.
+		# reset_smoothing() only clears Camera2D's own interpolation state, so a
+		# stale lead would teleport the camera straight back off the ship on the
+		# next physics frame and slide home over a second -- exactly the respawn
+		# slide re-targeting exists to prevent.
+		current_look_ahead = Vector2.ZERO
 		global_position = target.global_position
 		reset_smoothing()
 
