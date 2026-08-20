@@ -43,7 +43,7 @@ jobs:
           shopt -s nullglob
           scripts=(tests/pool/test_*.sh)
           if [ ${#scripts[@]} -eq 0 ]; then
-            echo "No shell suites found under tests/pool; skipping."
-          else
-            for t in "${scripts[@]}"; do bash "$t"; done
+            echo "FAIL: tests/pool/test_*.sh matched no files; treating an empty shell suite as a failure (fail closed)." >&2
+            exit 1
           fi
+          for t in "${scripts[@]}"; do bash "$t"; done
