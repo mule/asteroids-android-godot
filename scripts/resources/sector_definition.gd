@@ -3,7 +3,11 @@ class_name SectorDefinition
 
 
 @export var sector_name: StringName = &"vega_7"
-@export var world_size: Vector2 = Vector2(1152.0, 648.0)
+## The epic's sector is 8000x6000. #44 shipped this default at the old
+## viewport size so growing the world stayed #45's job; #45 has since grown
+## it, and a leftover 1152x648 default would hand any new SectorDefinition a
+## pre-epic world.
+@export var world_size: Vector2 = Vector2(8000.0, 6000.0)
 @export var sector_seed: int = 1729
 @export var boundary_margin: float = 600.0
 @export var asteroid_field_count: int = 5

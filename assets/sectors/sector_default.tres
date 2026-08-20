@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_sector")
 sector_name = &"vega_7"
-world_size = Vector2(1152, 648)
+world_size = Vector2(8000, 6000)
 sector_seed = 1729
 boundary_margin = 600.0
 asteroid_field_count = 5
