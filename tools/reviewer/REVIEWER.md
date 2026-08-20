@@ -9,7 +9,11 @@ checked out on that PR's head branch.
    passes tests but contradicts the sector design is a finding.
 3. Fix every finding you are confident about, directly on the PR branch.
    Leave a finding unfixed only when the fix is a design decision, not a defect.
-4. Run the Godot test suite. If it fails, fix it. Never push a red branch.
+4. Run every suite through `./tools/tests/run_godot_test.sh <suite.gd>`. If it
+   fails, fix it. Never push a red branch, and never run the suites bare:
+   `godot --script` exits 0 and prints `ALL TESTS PASSED` even when the script
+   under test failed to compile, so a bare run cannot tell you anything. The
+   runner is the only thing that turns a green suite into evidence.
 5. Commit and push. Comment on the PR with what you found and what you changed.
 6. Decide, and record the decision:
    - Clean, and you would defend every line of it →
@@ -41,4 +45,5 @@ Do not touch any PR other than #<PR>. Do not force-push. Never remove
 Your `mark-passed` is what merges this PR. The gate no longer waits for Jukka's
 approval, so between your review and `main` there is no second pair of eyes.
 Record a pass only for work you would defend under review yourself, and prefer
-`review-blocked` over a pass you are unsure of.
+`review-blocked` over a pass you are unsure of. A pass you recorded on the
+strength of a bare `godot --script` run is not a review — see step 4.
