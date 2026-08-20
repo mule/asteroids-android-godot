@@ -307,7 +307,7 @@ func _apply_lighting_to_entity(entity: Node) -> void:
 
 
 ## Push the current sector extent to everything that draws a box from it. The
-## camera's limits and the entities' wrap boxes come from the same authority
+## camera's limits and the entities' sector boxes come from the same authority
 ## and have to move together: Sector.get_bounds() never reports smaller than
 ## the visible rect, so a window resize can move where the world ends, and a
 ## camera left on its startup limits would show past the sector edge.

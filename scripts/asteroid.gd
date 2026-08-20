@@ -194,9 +194,6 @@ func _resolve_asteroid_collision(other: Area2D) -> void:
 	var separation_b := normal * (overlap * (mass_a / total_mass))
 	global_position += separation_a
 	other.global_position -= separation_b
-	_contain_in_sector()
-	if other.has_method("_contain_in_sector"):
-		other._contain_in_sector()
 
 	# Calculate velocity response (elastic bounce)
 	var vel_b: Vector2 = other.get("velocity") if other.get("velocity") != null else Vector2.ZERO
@@ -210,6 +207,15 @@ func _resolve_asteroid_collision(other: Area2D) -> void:
 		velocity += impulse / mass_a
 		if "velocity" in other:
 			other.velocity -= impulse / mass_b
+
+	# Contain after the impulse, not before it. Separation can shove either rock
+	# through a wall, and _contain_in_sector reflects velocity as well as
+	# clamping position -- run first, its reflection is simply overwritten by an
+	# impulse that can point straight back out, leaving a rock clamped on the
+	# wall taking a fresh impulse every frame until the sign happens to flip.
+	_contain_in_sector()
+	if other.has_method("_contain_in_sector"):
+		other._contain_in_sector()
 
 
 func get_visual_asset_id() -> StringName:

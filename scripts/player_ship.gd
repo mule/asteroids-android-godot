@@ -42,9 +42,14 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	if not controls_enabled:
-		_apply_drift(delta)
-		_move(delta)
-		_contain_in_sector(delta)
+		# Dead, respawning or on the game over screen. The ship holds still
+		# the way it did before containment existed -- letting it coast would
+		# drag the follow camera off across the sector while the player has no
+		# way to stop it. It is still clamped, because a viewport resize can
+		# shrink the sector under a ship that cannot fly itself back in, and
+		# the warning is cleared: there are no controls left to answer it.
+		position = WORLD_BOUNDS.clamp_to_sector(position, _get_sector_bounds(), 0.0)
+		_set_boundary_warning(false)
 		return
 
 	_update_fire_cooldown(delta)
@@ -135,13 +140,32 @@ func _contain_in_sector(delta: float) -> void:
 
 	if pressure != Vector2.ZERO:
 		velocity += pressure * acceleration * boundary_push_multiplier * delta
+		# The push is an acceleration like thrust and obeys the same cap.
+		# Without it the band acts as a slingshot: 600px of restoring
+		# acceleration hands a drifting ship more speed than it can ever
+		# reach under its own power.
+		velocity = velocity.limit_length(max_speed)
 
-	position = WORLD_BOUNDS.clamp_to_sector(position, bounds, 0.0)
+	# The wall stops the ship dead on whichever axis it clamped. Carrying the
+	# outward velocity on would leave a pinned ship reporting hundreds of px/s
+	# it is not travelling -- _apply_shoot_input hands that straight to the
+	# bullet as inherited velocity, and FollowCamera leads the view with it.
+	var contained := WORLD_BOUNDS.clamp_to_sector(position, bounds, 0.0)
+	if contained.x != position.x:
+		velocity.x = 0.0
+	if contained.y != position.y:
+		velocity.y = 0.0
 
-	var warning := pressure != Vector2.ZERO
-	if warning != boundary_warning_active:
-		boundary_warning_active = warning
-		boundary_warning_changed.emit(warning)
+	position = contained
+	_set_boundary_warning(pressure != Vector2.ZERO)
+
+
+func _set_boundary_warning(active: bool) -> void:
+	if active == boundary_warning_active:
+		return
+
+	boundary_warning_active = active
+	boundary_warning_changed.emit(active)
 
 
 func reset_for_respawn(spawn_position: Vector2) -> void:
@@ -150,9 +174,7 @@ func reset_for_respawn(spawn_position: Vector2) -> void:
 	velocity = Vector2.ZERO
 	fire_cooldown_remaining = 0.0
 	thrust_flame.visible = false
-	if boundary_warning_active:
-		boundary_warning_active = false
-		boundary_warning_changed.emit(false)
+	_set_boundary_warning(false)
 
 
 func set_controls_enabled(value: bool) -> void:

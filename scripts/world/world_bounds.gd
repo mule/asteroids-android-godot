@@ -5,24 +5,6 @@ extends RefCounted
 class_name WorldBounds
 
 
-static func wrap_to_bounds(position: Vector2, bounds: Rect2, margin: float) -> Vector2:
-	var minimum := bounds.position - Vector2.ONE * margin
-	var maximum := bounds.end + Vector2.ONE * margin
-	var wrapped := position
-
-	if wrapped.x < minimum.x:
-		wrapped.x = maximum.x
-	elif wrapped.x > maximum.x:
-		wrapped.x = minimum.x
-
-	if wrapped.y < minimum.y:
-		wrapped.y = maximum.y
-	elif wrapped.y > maximum.y:
-		wrapped.y = minimum.y
-
-	return wrapped
-
-
 static func clamp_to_sector(position: Vector2, bounds: Rect2, radius: float = 0.0) -> Vector2:
 	return Vector2(
 		clampf(position.x, bounds.position.x + radius, bounds.end.x - radius),
