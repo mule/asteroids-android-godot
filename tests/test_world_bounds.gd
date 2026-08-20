@@ -115,7 +115,7 @@ func _test_edge_pressure_ramps_inward(failures: Array[String]) -> void:
 func _test_sector_is_never_smaller_than_the_viewport(failures: Array[String]) -> void:
 	# project.godot stretches with aspect "expand", so the visible rect is only
 	# 1152x648 at exactly 16:9 and grows on every other window shape. The
-	# default sector is viewport-sized, so it must track that growth or
+	# sector must cover the visible rect however large the window grows, or
 	# entities wrap in the middle of the screen. See scripts/world/sector.gd.
 	var sector := Sector.new()
 	if sector == null:
@@ -152,6 +152,16 @@ func _test_entities_track_a_viewport_resize(failures: Array[String]) -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
+
+	# Shrink the sector below the viewport so Sector's "never smaller than what
+	# the player can see" clamp is the active term and bounds track the window.
+	# The shipped sector is 8000x6000 since #45, which swallows any resize the
+	# harness can perform: bounds would read identically before and after, and a
+	# game.gd that never re-pushed them would sail through this test. Injecting a
+	# tiny definition keeps the regression observable whatever world_size ships.
+	var small := SECTOR_DEFINITION.duplicate() as SectorDefinition
+	small.world_size = Vector2(64.0, 64.0)
+	game.sector.definition = small
 
 	var original_size := root.size
 	root.size = Vector2i(1400, 500)
