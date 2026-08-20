@@ -22,8 +22,11 @@ set -euo pipefail
 pr="$1"
 SLUG="${REVIEW_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}"
 
-# Must match PASS_PREFIX in lease.sh — `lease.sh mark-passed` writes this ref.
-PASS_PREFIX="reviewer-passed/pr-"
+# The namespace tools/reviewer/lease.sh's `mark-passed` writes into, via the
+# shared lock primitive in tools/pool/lock.sh (its `sha` subcommand owns the
+# actual ref path — no hand-copied ref format here to drift out of sync).
+NS_PASSED=reviewer-passed
+export POOL_REPO="$SLUG"
 
 read -r author changed_files additions head_sha merge_state <<<"$(gh pr view "$pr" --repo "$SLUG" \
   --json author,changedFiles,additions,headRefOid,mergeStateStatus \
@@ -47,7 +50,7 @@ has_label() { grep -qE "(^|,)$1(,|\$)" <<<"$labels"; }
 # `review-passed` label survives a later push; this ref does not, so a PR that
 # grows new commits after its review stops clearing the gate and falls back
 # into the claimable queue instead of merging on a stale label.
-reviewed_sha=$(gh api "repos/$SLUG/git/ref/${PASS_PREFIX}${pr}" -q .object.sha 2>/dev/null || true)
+reviewed_sha=$(./tools/pool/lock.sh sha "$NS_PASSED" "pr-$pr")
 
 # A missing ref does not answer with an empty string: gh writes the 404 body to
 # stdout, `-q` does not filter an error response, and `|| echo ""` appends to it

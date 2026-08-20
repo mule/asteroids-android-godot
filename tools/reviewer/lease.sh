@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Mutual exclusion for PR reviewer agents, arbitrated by GitHub.
 #
-# The lock is a git ref under refs/reviewer-locks/. Ref creation is an atomic
-# compare-and-swap on GitHub's side: the first agent to POST /git/refs wins,
-# every later agent gets HTTP 422 "Reference already exists". No coordinator,
-# no polling window, no double-review.
+# The mutex primitive itself (a namespaced git ref as an atomic
+# compare-and-swap) lives in tools/pool/lock.sh, shared with every agent
+# pool. This file is the reviewer pool's policy on top of it: which
+# namespaces it uses, what "claimable" means for a PR, the review-passed
+# sha pin, and reviewer-specific sweep/holders reporting.
 #
 # Usage:
 #   lease.sh claimable            # PR numbers nobody holds (one per line)
@@ -19,30 +20,33 @@ set -euo pipefail
 SLUG="${REVIEW_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}"
 AGENT="${REVIEWER_ID:-$(hostname)-$$}"
 TTL_MIN="${REVIEW_LEASE_TTL_MIN:-90}"
-LOCK_PREFIX="reviewer-locks/pr-"
-PASS_PREFIX="reviewer-passed/pr-"
 
-lock_ref() { printf 'refs/%s%s' "$LOCK_PREFIX" "$1"; }
+# lease.sh's own CLI and env contract (REVIEW_REPO, REVIEWER_ID,
+# REVIEW_LEASE_TTL_MIN) is public: a live Orca automation and
+# tools/reviewer/*.md call it as-is and must not change. lock.sh's contract
+# (POOL_REPO, POOL_AGENT_ID) is a separate, internal surface for the shared
+# primitive. Export the values lease.sh already resolved under lock.sh's
+# names so every $LOCK call below uses the same repo and identity, instead of
+# lock.sh re-deriving its own (an extra `gh repo view` and a different
+# hostname-pid identity per invocation).
+export POOL_REPO="$SLUG" POOL_AGENT_ID="$AGENT"
 
-held_prs() {
-  gh api "repos/$SLUG/git/matching-refs/${LOCK_PREFIX%pr-}" -q '.[].ref' 2>/dev/null \
-    | sed "s|^refs/${LOCK_PREFIX}||" || true
-}
+LOCK=./tools/pool/lock.sh
+NS=reviewer-locks
+NS_PASSED=reviewer-passed
+
+held_prs() { $LOCK held "$NS" | sed 's/^pr-//'; }
 
 # "pr<TAB>sha" for every PR a reviewer has already cleared, at the exact sha it
 # cleared. Storing the sha is what lets a PR re-enter the queue when new commits
 # land on it, without re-reviewing an unchanged branch every 30 minutes.
-passed_at() {
-  gh api "repos/$SLUG/git/matching-refs/${PASS_PREFIX%pr-}" 2>/dev/null \
-    | jq -r --arg p "refs/${PASS_PREFIX}" '.[] | "\(.ref | ltrimstr($p))\t\(.object.sha)"' \
-    || true
-}
+passed_at() { $LOCK shas "$NS_PASSED" | sed 's/^pr-//'; }
 
 mark_passed() {
   local pr=$1 sha
   sha=$(gh api "repos/$SLUG/pulls/$pr" -q .head.sha)
-  gh api -X DELETE "repos/$SLUG/git/refs/${PASS_PREFIX}${pr}" >/dev/null 2>&1 || true
-  gh api "repos/$SLUG/git/refs" -f ref="refs/${PASS_PREFIX}${pr}" -f sha="$sha" >/dev/null
+  $LOCK release "$NS_PASSED" "pr-$pr" >/dev/null
+  $LOCK claim "$NS_PASSED" "pr-$pr" "$sha" >/dev/null
   gh pr edit "$pr" --repo "$SLUG" --add-label review-passed >/dev/null 2>&1 || true
 }
 
@@ -78,40 +82,42 @@ mergeable() {
 claim() {
   local pr=$1 sha
   sha=$(gh api "repos/$SLUG/pulls/$pr" -q .head.sha)
-  gh api "repos/$SLUG/git/refs" -f ref="$(lock_ref "$pr")" -f sha="$sha" >/dev/null 2>&1 || return 1
-  gh pr comment "$pr" --repo "$SLUG" >/dev/null --body \
-    "<!-- review-lease agent=$AGENT at=$(date -u +%Y-%m-%dT%H:%M:%SZ) -->
-🤖 Review lease held by \`$AGENT\`."
+  $LOCK claim "$NS" "pr-$pr" "$sha" >/dev/null || return 1
+  $LOCK note "$pr" "Review lease held by \`$AGENT\`."
   gh pr edit "$pr" --repo "$SLUG" --add-label review-in-progress >/dev/null 2>&1 || true
   echo "$pr"
 }
 
 release() {
   local pr=$1
-  gh api -X DELETE "repos/$SLUG/git/refs/${LOCK_PREFIX}${pr}" >/dev/null 2>&1 || true
+  $LOCK release "$NS" "pr-$pr"
   gh pr edit "$pr" --repo "$SLUG" --remove-label review-in-progress >/dev/null 2>&1 || true
 }
+
+# Lease-holder marker comments. lock.sh's `note` (via `claim`, above) writes
+# "<!-- pool-lease", the namespace-generic marker. Comments already posted on
+# live PRs before this refactor carry the old "<!-- review-lease" marker, and
+# this repo's stale-lease detection below must keep recognising those or a
+# crashed reviewer's lock would silently never expire again. Match both;
+# nothing here ever writes the old marker any more.
+LEASE_MARKER_QUERY='.[] | select(.body | test("<!-- (review|pool)-lease")) | '
 
 # A crashed agent leaves its lock behind. Break locks whose newest lease
 # comment is older than TTL_MIN so the PR re-enters the pool.
 sweep() {
-  local pr stamp age_min now open
+  local pr stamp age_min now open_keys
+
+  # Merged and closed PRs leave lock and passed refs behind. gc both
+  # namespaces down to the open queue so they stay its size, not the repo's
+  # history.
+  open_keys=$(gh pr list --repo "$SLUG" --state open --limit 100 --json number -q '.[].number' | sed 's/^/pr-/')
+  $LOCK gc "$NS" $open_keys
+  $LOCK gc "$NS_PASSED" $open_keys
+
   now=$(date -u +%s)
-
-  # Merged and closed PRs leave lock and passed refs behind. Collect them so the
-  # lock namespace stays the size of the open queue, not the repo's history.
-  open=" $(gh pr list --repo "$SLUG" --state open --limit 100 --json number -q '.[].number' | tr '\n' ' ')"
-  for pr in $(held_prs) $(passed_at | cut -f1); do
-    case "$open" in
-      *" $pr "*) ;;
-      *) gh api -X DELETE "repos/$SLUG/git/refs/${LOCK_PREFIX}${pr}" >/dev/null 2>&1 || true
-         gh api -X DELETE "repos/$SLUG/git/refs/${PASS_PREFIX}${pr}" >/dev/null 2>&1 || true ;;
-    esac
-  done
-
   for pr in $(held_prs); do
     stamp=$(gh api "repos/$SLUG/issues/$pr/comments" --paginate \
-              -q '.[] | select(.body | contains("<!-- review-lease")) | .created_at' \
+              -q "${LEASE_MARKER_QUERY}.created_at" \
             | tail -1)
     [ -n "$stamp" ] || continue
     age_min=$(( (now - $(date -u -d "$stamp" +%s)) / 60 ))
@@ -126,7 +132,7 @@ holders() {
   local pr
   for pr in $(held_prs); do
     printf '#%s\t%s\n' "$pr" "$(gh api "repos/$SLUG/issues/$pr/comments" --paginate \
-      -q '.[] | select(.body | contains("<!-- review-lease")) | .body' | tail -1 | head -1)"
+      -q "${LEASE_MARKER_QUERY}.body" | tail -1 | head -1)"
   done
 }
 
