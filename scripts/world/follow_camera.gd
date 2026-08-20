@@ -8,6 +8,7 @@ extends Camera2D
 
 var target: Node2D
 var current_look_ahead: Vector2 = Vector2.ZERO
+var last_target_position: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
@@ -33,6 +34,7 @@ func set_target(node: Node2D) -> void:
 		# next physics frame and slide home over a second -- exactly the respawn
 		# slide re-targeting exists to prevent.
 		current_look_ahead = Vector2.ZERO
+		last_target_position = target.global_position
 		global_position = target.global_position
 		reset_smoothing()
 
@@ -48,9 +50,27 @@ func compute_look_ahead(velocity: Vector2) -> Vector2:
 	return (velocity * look_ahead_seconds).limit_length(max_look_ahead)
 
 
+## A single-frame displacement of more than one screen is a teleport, not
+## flight: the ship would have to cross the whole viewport in one physics tick.
+func _target_teleported() -> bool:
+	var screen_size := get_viewport_rect().size
+	var step := last_target_position.distance_squared_to(target.global_position)
+	return step > screen_size.length_squared()
+
+
 func _physics_process(delta: float) -> void:
 	if target == null or not is_instance_valid(target):
 		return
+
+	# The ship still wraps at the sector edge until #46 replaces wrapping with
+	# containment, and a wrap moves it the full width of the world in one frame.
+	# position_smoothing_enabled would interpolate across that, panning the view
+	# over the entire sector for about a second with the ship off-screen the
+	# whole way -- the player flies blind and can be killed without seeing what
+	# hit them. Cut instead. Velocity is unchanged by a wrap, so the look-ahead
+	# is already correct and is deliberately kept: clearing it here would make
+	# the lead pop back in over the next third of a second.
+	var teleported := _target_teleported()
 
 	var target_velocity: Vector2 = Vector2.ZERO
 	if "velocity" in target:
@@ -62,4 +82,8 @@ func _physics_process(delta: float) -> void:
 		clampf(look_ahead_smoothing * delta, 0.0, 1.0)
 	)
 
+	last_target_position = target.global_position
 	global_position = target.global_position + current_look_ahead
+
+	if teleported:
+		reset_smoothing()

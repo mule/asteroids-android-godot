@@ -16,6 +16,7 @@ func _init() -> void:
 	_test_edge_pressure_ramps_inward(failures)
 	await _test_sector_is_never_smaller_than_the_viewport(failures)
 	await _test_entities_track_a_viewport_resize(failures)
+	await _test_camera_limits_track_a_viewport_resize(failures)
 
 	for failure in failures:
 		printerr("FAIL: ", failure)
@@ -177,6 +178,50 @@ func _test_entities_track_a_viewport_resize(failures: Array[String]) -> void:
 		failures.append(
 			"Resize: player bounds %s must follow the visible rect %s"
 			% [ship_bounds.size, visible_size]
+		)
+
+	root.size = original_size
+	game.queue_free()
+	await process_frame
+
+
+func _test_camera_limits_track_a_viewport_resize(failures: Array[String]) -> void:
+	# The camera reads the same bounds authority the entities do, so it has to be
+	# re-pushed on the same signal. Left on its startup limits it would keep the
+	# old box and let the view show past the sector edge -- the one thing #45's
+	# acceptance criteria say must never happen.
+	var game := (load(GAME_SCENE) as PackedScene).instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+
+	# Same trick as the entity test above: the shipped 8000x6000 sector swallows
+	# any resize the harness can perform, so a camera that never refreshed would
+	# still read the right limits. Shrink the sector until the viewport clamp is
+	# the active term and the regression becomes observable.
+	var small := SECTOR_DEFINITION.duplicate() as SectorDefinition
+	small.world_size = Vector2(64.0, 64.0)
+	game.sector.definition = small
+
+	var camera: Camera2D = game.follow_camera
+	var limits_before := Vector2i(camera.limit_right, camera.limit_bottom)
+
+	var original_size := root.size
+	root.size = Vector2i(1400, 500)
+	await process_frame
+	await process_frame
+
+	var bounds: Rect2 = game.sector.get_bounds()
+	var expected := Vector2i(int(bounds.end.x), int(bounds.end.y))
+
+	if expected == limits_before:
+		failures.append(
+			"Resize: the resize did not move the sector end, so this proves nothing"
+		)
+	elif Vector2i(camera.limit_right, camera.limit_bottom) != expected:
+		failures.append(
+			"Resize: camera limits %s must follow the sector end %s"
+			% [Vector2i(camera.limit_right, camera.limit_bottom), expected]
 		)
 
 	root.size = original_size
