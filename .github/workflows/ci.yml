@@ -1,0 +1,49 @@
+name: tests
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot 4.7.1
+        run: |
+          set -euo pipefail
+          V=4.7.1
+          curl -fsSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${V}-stable/Godot_v${V}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          mkdir -p "$HOME/.local/bin"
+          mv Godot_v${V}-stable_linux.x86_64 "$HOME/.local/bin/godot"
+          chmod +x "$HOME/.local/bin/godot"
+
+      - name: Import project resources
+        run: $HOME/.local/bin/godot --headless --path . --quit || true
+
+      - name: Godot suites
+        run: |
+          set -euo pipefail
+          for t in tests/test_*.gd; do
+            GODOT_BIN="$HOME/.local/bin/godot" ./tools/tests/run_godot_test.sh "$t" 300
+          done
+
+      - name: Python suites
+        run: |
+          python3 -m pip install --quiet pytest
+          python3 -m pytest tests/asset_pipeline -q
+
+      - name: Shell suites
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          scripts=(tests/pool/test_*.sh)
+          if [ ${#scripts[@]} -eq 0 ]; then
+            echo "No shell suites found under tests/pool; skipping."
+          else
+            for t in "${scripts[@]}"; do bash "$t"; done
+          fi
