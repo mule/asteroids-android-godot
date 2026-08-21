@@ -7,11 +7,16 @@
 # failing the run.
 #
 # Labels come from $POOL_LABELS, comma-joined, when the caller has set it
-# -- including setting it to an empty string -- so tests run offline with
-# no `gh` call at all. Only an UNSET POOL_LABELS triggers a live fetch.
-# That distinction is `${POOL_LABELS-...}` (fires only when unset),
-# deliberately not `${POOL_LABELS:-...}` (which would also fire on an
-# empty-but-set value and defeat the "labels: none" test case).
+# -- including setting it to an empty string -- rather than a live fetch.
+# Only an UNSET POOL_LABELS triggers that fetch. That distinction is
+# `${POOL_LABELS-...}` (fires only when unset), deliberately not
+# `${POOL_LABELS:-...}` (which would also fire on an empty-but-set value
+# and defeat the "labels: none" test case).
+#
+# Setting POOL_LABELS alone does NOT make a run offline: the $SLUG lookup
+# below runs unconditionally, on every invocation, before POOL_LABELS is
+# even consulted -- it is not inside the same substitution. A caller that
+# wants zero `gh` calls (the test suite, for one) must set POOL_REPO too.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
