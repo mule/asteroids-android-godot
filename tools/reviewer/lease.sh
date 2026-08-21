@@ -59,7 +59,19 @@ mark_passed() {
 # at their current head sha.
 claimable() {
   local held open passed
-  held=$(held_prs)
+  # held_prs() pipes lock.sh's held() through sed; under pipefail, held()
+  # returning non-zero (the gh api call for reviewer-locks itself failed --
+  # auth/rate-limit/network) propagates through that pipe, and this used to
+  # be a plain assignment, so `set -e` would kill the whole function
+  # silently: exit 1, no stderr, no partial output. This is the LIVE
+  # reviewer pool's claim path on an enabled automation, so silent death is
+  # worse than a loud one -- detect it explicitly and refuse to report a
+  # claimable set with a diagnostic naming what failed, rather than relying
+  # on the bare `set -e` trip.
+  if ! held=$(held_prs); then
+    echo "lease.sh: failed to read $NS lock state (gh api error) - refusing to report claimable PRs" >&2
+    exit 1
+  fi
   passed=$(passed_at)
   open=$(gh pr list --repo "$SLUG" --state open --limit 100 \
            --json number,isDraft,labels,headRefOid \
