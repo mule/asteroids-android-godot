@@ -49,4 +49,27 @@ $L release "$NS" "probe-2" >/dev/null 2>&1
 # unknown subcommand: a clear error, not a silent no-op.
 $L bogus-subcommand >/dev/null 2>&1; check "unknown subcommand exits 2" 2 $?
 
+# held() must distinguish "the namespace genuinely holds nothing" (exit 0,
+# nothing printed) from "the gh api call itself failed" (non-zero exit).
+# Regression test for a bug where a trailing `|| true` on the whole
+# `gh api ... | sed ...` pipeline made a failed API call look exactly like
+# an empty namespace to every caller, including tools/implementer/ready.sh
+# -- an outage would then read as "nothing is locked" and let two agents
+# claim the same issue.
+check "held on a genuinely empty namespace exits 0" 0 "$($L held selftest-locks-truly-empty-ns >/dev/null 2>&1; echo $?)"
+
+STUBDIR=$(mktemp -d)
+REALGH=$(command -v gh)
+cat > "$STUBDIR/gh" <<STUBEOF
+#!/usr/bin/env bash
+case "\$*" in
+  *git/matching-refs*) exit 1 ;;
+  *) exec "$REALGH" "\$@" ;;
+esac
+STUBEOF
+chmod +x "$STUBDIR/gh"
+PATH="$STUBDIR:$PATH" $L held "$NS" >/dev/null 2>&1
+check "held propagates a failed gh api call as non-zero, not empty" 1 $?
+rm -rf "$STUBDIR"
+
 [ "$fails" -eq 0 ] || exit 1

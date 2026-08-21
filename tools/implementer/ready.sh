@@ -29,14 +29,35 @@ EPIC="${POOL_EPIC:-43}"
 NS=implementer-locks
 export POOL_REPO="$SLUG"
 
-# `|| true` on both: under pipefail, `grep -oE` finding zero matches (no
-# locks held / no open PRs referencing an issue — the common case) exits 1,
-# and a failing command substitution feeding a plain assignment aborts the
-# whole script under `set -e`, even though "nothing matched" is not an
-# error here.
-locked=" $("$LOCK" held "$NS" | sed 's/^issue-//' | tr '\n' ' ' || true) "
-linked=" $(gh pr list --repo "$SLUG" --state open --limit 100 --json body,title \
-             -q '.[] | "\(.title) \(.body)"' | grep -oE '#[0-9]+' | tr -d '#' | sort -u | tr '\n' ' ' || true) "
+# Capture each source's own fetch first, separately from the "reduce it to
+# a space-joined list" step, and fail CLOSED if the fetch itself failed.
+# Both `lock.sh held` (see its header comment) and `gh pr list` succeed
+# with empty output when there is genuinely nothing to report, and fail
+# (non-zero) on an API error -- collapsing those two into one "|| true"
+# would make a `gh` outage indistinguishable from "nothing is locked" /
+# "no PRs are open", silently disabling the exclusion. Locks are the
+# primary mutual-exclusion mechanism in this pool, so treating an outage as
+# "nothing held" is exactly how two agents end up claiming the same issue;
+# treating it as "nothing linked" is exactly how an agent starts work a PR
+# is already in flight for. Refusing to answer is the safe failure here.
+if ! locked_raw="$("$LOCK" held "$NS")"; then
+  echo "ready.sh: failed to read $NS lock state (gh api error) - refusing to report readiness" >&2
+  exit 1
+fi
+# sed/tr never fail on empty input, so no "|| true" is needed past this
+# point -- the only failure mode worth guarding against was the fetch above.
+locked=" $(printf '%s\n' "$locked_raw" | sed 's/^issue-//' | tr '\n' ' ') "
+
+if ! pr_text_raw="$(gh pr list --repo "$SLUG" --state open --limit 100 --json body,title \
+                       -q '.[] | "\(.title) \(.body)"')"; then
+  echo "ready.sh: failed to list open PRs (gh error) - refusing to report readiness" >&2
+  exit 1
+fi
+# Here `grep -oE` finding zero matches (no open PR mentions any issue
+# number -- the common case) is a legitimate "nothing found" exit 1, not a
+# fetch failure, so it's safe to swallow with "|| true" now that the fetch
+# itself is already known-good.
+linked=" $(printf '%s\n' "$pr_text_raw" | grep -oE '#[0-9]+' | tr -d '#' | sort -u | tr '\n' ' ' || true) "
 
 gh issue list --repo "$SLUG" --state open --limit 100 \
   --json number,body,labels \
@@ -62,5 +83,14 @@ gh issue list --repo "$SLUG" --state open --limit 100 \
       state=$(gh issue view "$dep" --repo "$SLUG" --json state -q .state 2>/dev/null || echo OPEN)
       [ "$state" = "CLOSED" ] || { blocked=yes; break; }
     done
-    [ "$blocked" = no ] && echo "$n"
+    # `if`, not `[ ... ] && echo`: the latter is the loop body's LAST
+    # command, so on the final-iterated issue being blocked, its own
+    # non-zero test result becomes the while loop's (and thus the whole
+    # pipeline's, under pipefail) exit status -- a perfectly healthy run
+    # would read as a failure the moment the lowest/last open issue isn't
+    # ready, which is the ordinary steady state, not an edge case. `if`
+    # with no `else` always exits 0 when its condition is false.
+    if [ "$blocked" = no ]; then
+      echo "$n"
+    fi
   done | sort -n

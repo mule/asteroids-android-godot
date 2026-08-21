@@ -12,9 +12,20 @@ AGENT="${POOL_AGENT_ID:-$(hostname)-$$}"
 
 ref_of() { printf 'refs/%s/%s' "$1" "$2"; }
 
+# Exit-code contract callers rely on (tools/implementer/ready.sh in
+# particular): 0 = a trustworthy list, possibly empty, because the
+# namespace genuinely holds no locks. Non-zero = the `gh api` call itself
+# failed (auth, rate limit, network) and the list must NOT be trusted as
+# "nothing held" -- an empty held-set during an outage is how two agents
+# end up claiming the same issue. Capture the API call's own exit status
+# before any further processing, rather than swallowing it with a trailing
+# `|| true` on the whole pipeline (that used to make a failed call look
+# identical to a genuinely empty namespace).
 held() {
-  gh api "repos/$SLUG/git/matching-refs/$1/" -q '.[].ref' 2>/dev/null \
-    | sed "s|^refs/$1/||" || true
+  local out
+  out=$(gh api "repos/$SLUG/git/matching-refs/$1/" -q '.[].ref' 2>/dev/null) || return 1
+  [ -n "$out" ] || return 0
+  printf '%s\n' "$out" | sed "s|^refs/$1/||"
 }
 
 claim() { # claim <ns> <key> <sha>
