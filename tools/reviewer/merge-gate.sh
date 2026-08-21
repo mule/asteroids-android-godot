@@ -28,6 +28,11 @@ SLUG="${REVIEW_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}"
 NS_PASSED=reviewer-passed
 export POOL_REPO="$SLUG"
 
+# Anchored to this script's own location, not cwd — a bare relative path
+# would break the moment this ran from somewhere other than the repo root.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOCK="$SCRIPT_DIR/../pool/lock.sh"
+
 read -r author changed_files additions head_sha merge_state <<<"$(gh pr view "$pr" --repo "$SLUG" \
   --json author,changedFiles,additions,headRefOid,mergeStateStatus \
   -q '"\(.author.login) \(.changedFiles) \(.additions) \(.headRefOid) \(.mergeStateStatus)"')"
@@ -50,7 +55,7 @@ has_label() { grep -qE "(^|,)$1(,|\$)" <<<"$labels"; }
 # `review-passed` label survives a later push; this ref does not, so a PR that
 # grows new commits after its review stops clearing the gate and falls back
 # into the claimable queue instead of merging on a stale label.
-reviewed_sha=$(./tools/pool/lock.sh sha "$NS_PASSED" "pr-$pr")
+reviewed_sha=$("$LOCK" sha "$NS_PASSED" "pr-$pr")
 
 # A missing ref does not answer with an empty string: gh writes the 404 body to
 # stdout, `-q` does not filter an error response, and `|| echo ""` appends to it

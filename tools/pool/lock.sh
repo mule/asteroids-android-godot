@@ -49,17 +49,32 @@ shas() {
 }
 
 # The sha a single key's ref points at, empty if the ref does not exist.
+# On a 404, `gh api` exits non-zero but still writes the error JSON body to
+# stdout (not stderr) — capture into a var first so a missing ref truly
+# yields nothing, rather than leaking `{"message":"Not Found",...}` as if it
+# were a sha.
 sha() { # sha <ns> <key>
-  gh api "repos/$SLUG/git/ref/$1/$2" -q .object.sha 2>/dev/null || true
+  local out
+  out=$(gh api "repos/$SLUG/git/ref/$1/$2" -q .object.sha 2>/dev/null) || out=""
+  printf '%s\n' "$out"
 }
 
-# ISO timestamp of the newest lease marker comment on issue-or-PR <n>.
-# GitHub serves PR and issue comments from the same endpoint, so one
-# implementation covers both pools.
+# ISO timestamp of the newest lease marker comment on issue-or-PR <n>, empty
+# if there is none. Two failure modes matter here, both from a key whose
+# derived <n> isn't a real issue/PR number: (1) under `set -e`, a failing
+# `gh api` would abort the whole script rather than let the caller's
+# `[ -n "$ts" ] || continue` guard run — one bad key would kill sweep()
+# before it reaches the rest; (2) on failure `gh api` still writes the error
+# JSON body to stdout (not stderr), so a bare `|| true` alone would still
+# leak that body out as if it were a timestamp, which `date -u -d` in
+# sweep() would then fail to parse and abort on anyway. Capture first, so a
+# failed lookup truly produces nothing.
 stamp() {
-  gh api "repos/$SLUG/issues/$1/comments" --paginate \
+  local out
+  out=$(gh api "repos/$SLUG/issues/$1/comments" --paginate \
     -q '.[] | select(.body | contains("<!-- pool-lease")) | .created_at' \
-    2>/dev/null | tail -1
+    2>/dev/null) || return 0
+  printf '%s\n' "$out" | tail -1
 }
 
 note() { # note <n> <text> — record who holds the lease, for stale detection

@@ -31,7 +31,12 @@ TTL_MIN="${REVIEW_LEASE_TTL_MIN:-90}"
 # hostname-pid identity per invocation).
 export POOL_REPO="$SLUG" POOL_AGENT_ID="$AGENT"
 
-LOCK=./tools/pool/lock.sh
+# Anchored to this script's own location, not cwd: lease.sh is invoked from
+# various places (coordinator loop, tests), and a cwd-relative path here
+# would 127 under set -e the moment something ran it from elsewhere,
+# breaking release()'s "always run, even on failure" contract below.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOCK="$SCRIPT_DIR/../pool/lock.sh"
 NS=reviewer-locks
 NS_PASSED=reviewer-passed
 
@@ -90,7 +95,11 @@ claim() {
 
 release() {
   local pr=$1
-  $LOCK release "$NS" "pr-$pr"
+  # lock.sh's own release always exits 0 by contract, but the invocation
+  # itself can still fail (e.g. the helper is missing -> 127). Guard it so
+  # this always reaches the label removal, matching the "always run, even
+  # on failure" contract callers rely on.
+  $LOCK release "$NS" "pr-$pr" || true
   gh pr edit "$pr" --repo "$SLUG" --remove-label review-in-progress >/dev/null 2>&1 || true
 }
 

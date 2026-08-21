@@ -23,4 +23,30 @@ $L claim "$NS" "$KEY" "$SHA" >/dev/null 2>&1
 $L release "$NS" "$KEY" >/dev/null 2>&1
 check "release frees the key" "" "$($L held "$NS")"
 
+# sha on a ref that was never claimed must be empty, not the raw 404 body
+# gh api leaves on stdout (regression test for the "missing ref reads as
+# present" bug).
+check "sha on a missing ref is empty" "" "$($L sha "$NS" never-claimed-key 2>/dev/null)"
+
+# stamp's <n> is derived from a key's suffix and is not always a real
+# issue/PR number. A bad one must not abort the script (it used to, via a
+# raw failing `gh api` under set -e) and must not leak the 404 body as if
+# it were a timestamp.
+$L stamp not-a-real-issue-id >/dev/null 2>&1; check "stamp on a bad id doesn't abort" 0 $?
+check "stamp on a bad id is empty" "" "$($L stamp not-a-real-issue-id 2>/dev/null)"
+
+# sweep must process every held key even when the first one it looks at
+# can't be stamped -- with the un-fixed stamp(), this died on the first key
+# and never reached the second.
+$L claim "$NS" "badstamp-xyz" "$SHA" >/dev/null 2>&1
+$L claim "$NS" "probe-2" "$SHA" >/dev/null 2>&1
+$L sweep "$NS" 999999 >/dev/null 2>&1; check "sweep completes past an unstampable key" 0 $?
+check "sweep left both keys alone (ttl not exceeded)" "badstamp-xyz
+probe-2" "$($L held "$NS")"
+$L release "$NS" "badstamp-xyz" >/dev/null 2>&1
+$L release "$NS" "probe-2" >/dev/null 2>&1
+
+# unknown subcommand: a clear error, not a silent no-op.
+$L bogus-subcommand >/dev/null 2>&1; check "unknown subcommand exits 2" 2 $?
+
 [ "$fails" -eq 0 ] || exit 1
