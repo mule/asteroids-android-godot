@@ -10,11 +10,13 @@
 #
 # Facts available to you (all already fetched below):
 #   $pr             PR number
-#   $checks         "pass" | "fail" | "pending" | "none". "pass" is stricter
-#                   than "the rollup is not red": it additionally requires the
-#                   `tests` check (the job in .github/workflows/ci.yml) to be
-#                   present and SUCCESS. A rollup of unrelated green checks
-#                   with no `tests` entry is "none", not "pass".
+#   $checks         "pass" | "fail" | "pending" | "none". Stricter than "the
+#                   rollup is not red": "pass" additionally requires a check
+#                   named $CI_JOB to be present and SUCCESS, so a rollup of
+#                   unrelated green checks is "none", not "pass". "fail" is
+#                   reserved for terminal negative conclusions; SKIPPED,
+#                   CANCELLED, NEUTRAL and STALE are absence of a verdict and
+#                   read as "none", an empty conclusion reads as "pending".
 #   $approvals      number of human APPROVED reviews
 #   $reviewed_sha   head sha a reviewer cleared, "" if it never cleared one
 #   $head_sha       head sha the PR is at right now
@@ -44,6 +46,17 @@ pr="$1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCK="$SCRIPT_DIR/../pool/lock.sh"
 ROSTER="$SCRIPT_DIR/../pool/roster.sh"
+
+# The one check whose verdict this gate treats as "CI". It is the job id in
+# .github/workflows/ci.yml, and because that job carries no `name:` it is also
+# the check-run name GitHub reports (PR #67's rollup reads `tests:SUCCESS`).
+#
+# Nothing in git ties this string to that file, and renaming the job would
+# silently turn every PR into checks=none. tests/pool/test_merge_gate.sh reads
+# this line and asserts the job id still exists in the workflow, so the two
+# cannot drift apart unnoticed. Keep it a plain literal assignment on one line:
+# that test parses it.
+CI_JOB=tests
 
 # Set only by the GATE_FACTS branch; empty everywhere else means "derive it
 # from the labels", which is what the live path wants.
@@ -87,58 +100,89 @@ else
     --json author,changedFiles,additions,headRefOid,mergeStateStatus \
     -q '"\(.author.login) \(.changedFiles) \(.additions) \(.headRefOid) \(.mergeStateStatus)"')"
 
+  # ONE rollup query serving both classifiers below, because they read the same
+  # object and one call means one exit status to get right.
+  #
+  # A FAILED QUERY IS AN ERROR, NEVER DATA. `gh` writes its error body to
+  # STDOUT, so a failed call produces output that reads like a rollup. The
+  # previous `2>/dev/null || echo ""` fed that body straight into the
+  # classifier, where `{"message":"Bad credentials"}` matched neither the
+  # failure nor the pending patterns and fell through to checks="pass" — an
+  # auth expiry, a rate limit or a transient 5xx made this gate return 0 and
+  # MERGE. So: capture the exit status, and on non-zero refuse without
+  # inspecting the output at all. Non-empty output is not evidence of success.
+  #
+  # This refuses with exit 1 rather than exit 2 because a failed API call is
+  # not "clean but unsigned", it is "the gate could not evaluate". gh's own
+  # stderr is deliberately left unsuppressed so the operator sees the cause.
+  rollup=""
+  rollup_rc=0
   rollup=$(gh pr view "$pr" --repo "$SLUG" --json statusCheckRollup \
-    -q '[.statusCheckRollup[]?.conclusion // .statusCheckRollup[]?.state] | @csv' 2>/dev/null || echo "")
-  if   [ -z "$rollup" ];                       then checks="none"
-  elif grep -qiE 'FAILURE|ERROR|TIMED_OUT'     <<<"$rollup"; then checks="fail"
-  elif grep -qiE 'PENDING|IN_PROGRESS|QUEUED'  <<<"$rollup"; then checks="pending"
-  else                                              checks="pass"; fi
+    -q '.statusCheckRollup[]? | "\(.name // .context)\t\(.conclusion // .state // "")"') \
+    || rollup_rc=$?
+  if [ "$rollup_rc" -ne 0 ]; then
+    echo "gate: 'gh pr view --json statusCheckRollup' failed for #$pr (exit $rollup_rc) -> hold; the check status is unknown, and unknown is not green" >&2
+    exit 1
+  fi
 
-  # The rollup above answers "is anything red or still running", which is not
-  # the same question as "did this repo's suite run and go green". A PR that
-  # carries one unrelated successful check and no `tests` entry at all produced
-  # checks=pass and merged — on a build that never happened. The whole autonomy
-  # argument is "green CI plus a higher-tier review", so the gate has to name
-  # the check it means.
+  # Verdicts are read from the second column only. Matching the whole line
+  # would let a check NAMED "failure-injection" read as a failing build.
   #
-  # `tests` is the job id in .github/workflows/ci.yml, and with no `name:` on
-  # that job it is also the check-run name GitHub reports here (PR #67's rollup
-  # reads `tests:SUCCESS`).
-  #
-  # Second call rather than reworking the first: the two answers are different
-  # questions and this one must fail differently. `|| rollup_named=""` REPLACES
-  # the value instead of appending to it, because `gh` writes error bodies to
-  # stdout — a `|| echo ""` here would launder an error JSON into the check
-  # names and could match nothing while looking like a clean read.
-  rollup_named=$(gh pr view "$pr" --repo "$SLUG" --json statusCheckRollup \
-    -q '.statusCheckRollup[]? | "\(.name // .context)=\(.conclusion // .state // "")"') \
-    || rollup_named=""
-
-  # Every entry, not just the first: a re-run can leave two rows with this name
-  # and any non-SUCCESS among them means the suite is not green.
+  # Three groups, and the line between them is the same one the `approved`
+  # label is built on — a terminal negative conclusion is a verdict of red, and
+  # everything else is the absence of one:
+  #   terminal negative -> "fail" (exit 1, a human is needed). ERROR is kept
+  #     from the pre-existing set (it is the StatusContext spelling) even though
+  #     the round-2 ruling did not enumerate it; dropping it would quietly
+  #     weaken the gate.
+  #   still running     -> "pending" (exit 2). An empty conclusion is the shape
+  #     of an in-flight check run, so it belongs here, not in "fail".
+  #   SKIPPED, CANCELLED, NEUTRAL, STALE and anything unrecognised -> handled
+  #     below as absence, never as red. Cancelled runs are routine (a
+  #     superseding push, a concurrency group); calling them red would exit 1,
+  #     which makes the reviewer stamp the sticky `review-blocked` label on
+  #     ordinary activity and teaches an operator to strip the one label that
+  #     means a human owes an answer.
+  rollup_fail=0
+  rollup_pending=0
   tests_seen=0
-  tests_green=1
-  while IFS= read -r entry; do
-    case "$entry" in
-      tests=*)
-        tests_seen=1
-        case "${entry#tests=}" in SUCCESS|success) ;; *) tests_green=0 ;; esac ;;
+  tests_fail=0
+  tests_pending=0
+  tests_inconclusive=0
+  while IFS=$'\t' read -r c_name c_verdict; do
+    [ -n "$c_name" ] || continue
+    case "$c_verdict" in
+      FAILURE|ERROR|TIMED_OUT|ACTION_REQUIRED|STARTUP_FAILURE) rollup_fail=1 ;;
+      PENDING|IN_PROGRESS|QUEUED|WAITING|REQUESTED|'')         rollup_pending=1 ;;
     esac
-  done <<<"$rollup_named"
+    [ "$c_name" = "$CI_JOB" ] || continue
+    tests_seen=1
+    case "$c_verdict" in
+      SUCCESS)                                                 ;;
+      FAILURE|ERROR|TIMED_OUT|ACTION_REQUIRED|STARTUP_FAILURE) tests_fail=1 ;;
+      PENDING|IN_PROGRESS|QUEUED|WAITING|REQUESTED|'')         tests_pending=1 ;;
+      *)                                                       tests_inconclusive=1 ;;
+    esac
+  done <<<"$rollup"
 
-  # An additional requirement, never a relaxation: this can only downgrade
-  # `pass`, never promote anything to it.
-  #   tests absent    -> "none". Absence of evidence, so it lands on the exit-2
-  #                      arm and a human's `approved` can still vouch for it.
-  #   tests not green -> "fail". Present and not SUCCESS is negative evidence,
-  #                      including SKIPPED and CANCELLED: a suite that did not
-  #                      finish is not a suite that passed, and no label gets
-  #                      to wave that through.
+  if   [ -z "$rollup" ];             then checks="none"
+  elif [ "$rollup_fail" -eq 1 ];     then checks="fail"
+  elif [ "$rollup_pending" -eq 1 ];  then checks="pending"
+  else                                    checks="pass"; fi
+
+  # "Nothing red and nothing running" is not the same question as "did this
+  # repo's suite run and go green". A PR carrying one unrelated successful
+  # check and no `$CI_JOB` row at all produced checks=pass and merged, on a
+  # build that never happened. The whole autonomy argument is "green CI plus a
+  # higher-tier review", so the gate has to name the check it means.
+  #
+  # Worst verdict wins across duplicate rows: a re-run can leave two.
+  # This can only ever downgrade `pass`, never promote anything to it.
   if [ "$checks" = "pass" ]; then
-    if [ "$tests_seen" -eq 0 ]; then
-      checks="none"
-    elif [ "$tests_green" -eq 0 ]; then
-      checks="fail"
+    if   [ "$tests_seen" -eq 0 ];         then checks="none"
+    elif [ "$tests_fail" -eq 1 ];         then checks="fail"
+    elif [ "$tests_pending" -eq 1 ];      then checks="pending"
+    elif [ "$tests_inconclusive" -eq 1 ]; then checks="none"
     fi
   fi
 

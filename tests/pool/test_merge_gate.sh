@@ -146,14 +146,13 @@ case "$args" in
   *"repo view --json nameWithOwner"*) printf '%s\n' "mule/asteroids-android-godot" ;;
   *"--json author,changedFiles,additions,headRefOid,mergeStateStatus"*)
     printf '%s\n' "octo 3 42 $FAKE_HEAD $FAKE_MERGE_STATE" ;;
-  # Both rollup queries say "--json statusCheckRollup"; only the named one also
-  # mentions .name. Matching on ".name" alone would also swallow the labels
-  # query ([.labels[].name]) and the repo-view query (.nameWithOwner), which is
-  # exactly the kind of stub that answers the wrong question convincingly.
-  *"--json statusCheckRollup"*".name"*) printf '%s\n' "$FAKE_ROLLUP_NAMED" ;;
-  *"--json statusCheckRollup"*)         printf '%s\n' "$FAKE_ROLLUP" ;;
-  *"--json reviews"*)           printf '%s\n' "$FAKE_APPROVALS" ;;
-  *"--json labels"*)            printf '%s\n' "$FAKE_LABELS" ;;
+  # One rollup query now. It can be made to FAIL while still writing to stdout,
+  # which is what `gh` really does with an error body and is the whole point of
+  # the fail-closed rows below.
+  *"--json statusCheckRollup"*)
+    printf '%s\n' "$FAKE_ROLLUP"; exit "$FAKE_ROLLUP_RC" ;;
+  *"--json reviews"*) printf '%s\n' "$FAKE_APPROVALS" ;;
+  *"--json labels"*)  printf '%s\n' "$FAKE_LABELS" ;;
   *"git/ref/reviewer-passed/pr-99"*) printf '%s\n' "$FAKE_PASSED"; exit "$FAKE_PASSED_RC" ;;
   *) printf 'stub: unexpected gh %s\n' "$args" >&2; exit 1 ;;
 esac
@@ -161,25 +160,27 @@ GH
 chmod +x "$STUB/gh"
 export GH_CALLS="$STUB/calls" FAKE_HEAD="$HEAD"
 
-live(){ # live <rollup> <labels> <passed-sha> <approvals> <merge_state> [passed-rc] [named-rollup]
+live(){ # live <rollup> <labels> <passed-sha> <approvals> <merge_state> [passed-rc] [rollup-rc]
+  # <rollup> is written as newline-separated `name=verdict` for readability and
+  # converted to the tab-separated shape the gate's -q template emits. When
+  # <rollup-rc> is non-zero it is passed through verbatim instead, because that
+  # is the case where the text is an error body rather than a rollup.
   : > "$GH_CALLS"
-  # The named rollup defaults to agreeing with the anonymous one, so the rows
-  # that are not about the `tests` assertion do not have to restate it. An
-  # empty rollup means an empty check set, named or not.
-  local named
-  if [ "$#" -ge 7 ]; then named="$7"
-  elif [ -z "$1" ];  then named=""
-  else                    named="tests=SUCCESS"
+  local rrc="${7:-0}" rollup
+  if [ "$rrc" -ne 0 ] || [ -z "$1" ]; then
+    rollup="$1"
+  else
+    rollup=$(printf '%s\n' "$1" | awk -F= '{printf "%s\t%s\n", $1, $2}')
   fi
-  export FAKE_ROLLUP="$1" FAKE_LABELS="$2" FAKE_PASSED="$3" \
+  export FAKE_ROLLUP="$rollup" FAKE_LABELS="$2" FAKE_PASSED="$3" \
          FAKE_APPROVALS="$4" FAKE_MERGE_STATE="$5" FAKE_PASSED_RC="${6:-0}" \
-         FAKE_ROLLUP_NAMED="$named"
+         FAKE_ROLLUP_RC="$rrc"
   env -u GATE_FACTS PATH="$STUB:$PATH" $G 99 >/dev/null 2>"$STUB/err"
   echo $?
 }
 
 check "live: green checks + a review at head merges" 0 \
-  "$(live '"SUCCESS"' 'review-passed' "$HEAD" 0 CLEAN)"
+  "$(live 'tests=SUCCESS' 'review-passed' "$HEAD" 0 CLEAN)"
 contains "live: it really called gh pr view" "gh pr view 99 --repo mule/asteroids-android-godot" \
   "$(cat "$GH_CALLS")"
 contains "live: it really read the sha-pinned sign-off ref" "git/ref/reviewer-passed/pr-99" \
@@ -187,37 +188,108 @@ contains "live: it really read the sha-pinned sign-off ref" "git/ref/reviewer-pa
 check "live: and it did NOT announce injected facts" "" \
   "$(grep -c INJECTED "$STUB/err" | grep -v '^0$' || true)"
 
-check "live: the new hold rule applies to live data too" 1 \
-  "$(live '"SUCCESS"' 'review-passed,hold' "$HEAD" 0 CLEAN)"
-check "live: an empty rollup is checks=none and now waits" 2 \
+check "live: the hold rule applies to live data too" 1 \
+  "$(live 'tests=SUCCESS' 'review-passed,hold' "$HEAD" 0 CLEAN)"
+check "live: an empty rollup is checks=none and waits" 2 \
   "$(live '' 'review-passed' "$HEAD" 0 CLEAN)"
 check "live: a 404 on the sign-off ref is 'no review', not a sha" 2 \
-  "$(live '"SUCCESS"' 'review-passed' '{"message":"Not Found"}' 0 CLEAN 1)"
+  "$(live 'tests=SUCCESS' 'review-passed' '{"message":"Not Found"}' 0 CLEAN 1)"
 check "live: an impl-tier:3 PR finds no eligible reviewer" 2 \
-  "$(live '"SUCCESS"' 'review-passed,impl-tier:3' "$HEAD" 0 CLEAN)"
+  "$(live 'tests=SUCCESS' 'review-passed,impl-tier:3' "$HEAD" 0 CLEAN)"
 
-# --- the `tests` job must be named, not merely inferred from a green rollup ---
-# `tests` is the job id in .github/workflows/ci.yml, and with no `name:` on that
-# job it is also the check-run name GitHub reports.
+# --- a FAILED rollup query is an error, never data ---------------------------
+# `gh` writes its error body to stdout. Before this was fixed, that body was
+# classified like a rollup, matched no failure or pending pattern, and fell
+# through to checks=pass — the gate returned 0 and MERGED on an auth expiry, a
+# rate limit or a transient 5xx. Non-empty output is not evidence of success.
+check "live: a failed rollup query holds instead of merging" 1 \
+  "$(live '{"message":"Bad credentials","status":"401"}' 'review-passed' "$HEAD" 0 CLEAN 0 1)"
+contains "live: and it names the call that failed" "statusCheckRollup' failed" \
+  "$(cat "$STUB/err")"
+check "live: a failed rollup query is not rescued by approved either" 1 \
+  "$(live '{"message":"API rate limit exceeded"}' 'approved' "$HEAD" 0 CLEAN 0 1)"
+# An error body that happens to contain the word FAILURE must still be refused
+# as an error, not classified as a red build that merely looks the same.
+check "live: an error body mentioning FAILURE is still an error" 1 \
+  "$(live '{"message":"FAILURE contacting api.github.com"}' 'review-passed' "$HEAD" 0 CLEAN 0 1)"
+
+# --- the $CI_JOB check must be named, not inferred from a green rollup -------
 check "live: a green rollup WITHOUT a tests entry must not merge" 2 \
-  "$(live '"SUCCESS"' 'review-passed' "$HEAD" 0 CLEAN 0 'lint=SUCCESS')"
+  "$(live 'lint=SUCCESS' 'review-passed' "$HEAD" 0 CLEAN)"
 contains "live: and it says the evidence is missing, not that it passed" "checks=none" \
   "$(cat "$STUB/err")"
 check "live: a green rollup WITH a tests entry merges" 0 \
-  "$(live '"SUCCESS"' 'review-passed' "$HEAD" 0 CLEAN 0 'lint=SUCCESS
-tests=SUCCESS')"
-check "live: a red tests job is a hold even under a green-looking rollup" 1 \
-  "$(live '"SUCCESS"' 'review-passed' "$HEAD" 0 CLEAN 0 'tests=FAILURE')"
-check "live: a SKIPPED tests job did not pass" 1 \
-  "$(live '"SUCCESS"' 'review-passed' "$HEAD" 0 CLEAN 0 'tests=SKIPPED')"
-check "live: one green and one red tests row is not green" 1 \
-  "$(live '"SUCCESS"' 'review-passed' "$HEAD" 0 CLEAN 0 'tests=SUCCESS
-tests=FAILURE')"
-# A missing tests job is absence of evidence, so the human fast-path still works.
-check "live: approved rescues a rollup with no tests entry" 0 \
-  "$(live '"SUCCESS"' 'approved' "" 0 CLEAN 0 'lint=SUCCESS')"
-# ... but a red tests job is negative evidence, and no label overrides it.
-check "live: approved does not rescue a red tests job" 1 \
-  "$(live '"SUCCESS"' 'approved' "" 0 CLEAN 0 'tests=FAILURE')"
+  "$(live 'lint=SUCCESS
+tests=SUCCESS' 'review-passed' "$HEAD" 0 CLEAN)"
+# A check merely NAMED like a verdict must not be read as one.
+check "live: a check named failure-injection is not a failing build" 0 \
+  "$(live 'failure-injection=SUCCESS
+tests=SUCCESS' 'review-passed' "$HEAD" 0 CLEAN)"
+
+# --- every conclusion value this gate classifies -----------------------------
+# Terminal negative conclusions are a verdict of red -> "fail" -> exit 1.
+# Everything else that is not SUCCESS is the ABSENCE of a verdict: an empty
+# conclusion is an in-flight run -> "pending", and SKIPPED / CANCELLED /
+# NEUTRAL / STALE -> "none". Both are exit 2: they block the merge, self-heal
+# on a re-run, and stay rescuable by `approved`. Routing them to exit 1 would
+# make the reviewer stamp the sticky review-blocked label on routine activity.
+tests_row(){ live "tests=$1" 'review-passed' "$HEAD" 0 CLEAN; }
+check "conclusion SUCCESS         -> merge"   0 "$(tests_row SUCCESS)"
+check "conclusion FAILURE         -> hold"    1 "$(tests_row FAILURE)"
+check "conclusion TIMED_OUT       -> hold"    1 "$(tests_row TIMED_OUT)"
+check "conclusion ACTION_REQUIRED -> hold"    1 "$(tests_row ACTION_REQUIRED)"
+check "conclusion STARTUP_FAILURE -> hold"    1 "$(tests_row STARTUP_FAILURE)"
+check "conclusion ERROR           -> hold"    1 "$(tests_row ERROR)"
+check "conclusion SKIPPED         -> wait"    2 "$(tests_row SKIPPED)"
+check "conclusion CANCELLED       -> wait"    2 "$(tests_row CANCELLED)"
+check "conclusion NEUTRAL         -> wait"    2 "$(tests_row NEUTRAL)"
+check "conclusion STALE           -> wait"    2 "$(tests_row STALE)"
+check "conclusion <empty>         -> wait"    2 "$(tests_row '')"
+check "conclusion IN_PROGRESS     -> wait"    2 "$(tests_row IN_PROGRESS)"
+check "an unrecognised conclusion is absence, not a pass" 2 "$(tests_row WHAT_IS_THIS)"
+
+contains "an in-flight tests row reads as pending, not failed" "checks=pending" \
+  "$(tests_row '' >/dev/null; cat "$STUB/err")"
+contains "a cancelled tests row reads as none, not failed" "checks=none" \
+  "$(tests_row CANCELLED >/dev/null; cat "$STUB/err")"
+
+# Worst verdict wins across duplicate rows: a re-run can leave two.
+check "one green and one red tests row is not green" 1 \
+  "$(live 'tests=SUCCESS
+tests=FAILURE' 'review-passed' "$HEAD" 0 CLEAN)"
+check "one green and one cancelled tests row is not green" 2 \
+  "$(live 'tests=SUCCESS
+tests=CANCELLED' 'review-passed' "$HEAD" 0 CLEAN)"
+
+# Absence is rescuable by a human; a terminal negative is not.
+check "approved rescues a rollup with no tests entry" 0 \
+  "$(live 'lint=SUCCESS' 'approved' "" 0 CLEAN)"
+check "approved rescues a CANCELLED tests job" 0 \
+  "$(live 'tests=CANCELLED' 'approved' "" 0 CLEAN)"
+check "approved rescues an in-flight tests job" 0 \
+  "$(live 'tests=' 'approved' "" 0 CLEAN)"
+check "approved does not rescue a red tests job" 1 \
+  "$(live 'tests=FAILURE' 'approved' "" 0 CLEAN)"
+
+# --- the job name is not a guess ---------------------------------------------
+# The gate hardcodes one check name. Nothing in git ties it to the workflow, and
+# renaming that job would silently turn every PR into checks=none — this build
+# already shipped one bug of exactly this shape (a lease-comment marker string
+# two files had to agree on, and didn't). So read the name out of the gate and
+# assert the job really exists, rather than restating "tests" here and moving
+# the coupling one file over.
+CI_JOB=$(awk '/^CI_JOB=/{sub(/^CI_JOB=/,""); print $1; exit}' tools/reviewer/merge-gate.sh)
+check "the gate declares the CI job it requires" "yes" \
+  "$([ -n "$CI_JOB" ] && echo yes || echo no)"
+check "that job id exists in .github/workflows/ci.yml" "yes" \
+  "$(grep -qE "^[[:space:]]{2}${CI_JOB}:[[:space:]]*$" .github/workflows/ci.yml && echo yes || echo no)"
+check "and the workflow runs on pull_request, or the check never appears" "yes" \
+  "$(grep -qE '^[[:space:]]+pull_request:' .github/workflows/ci.yml && echo yes || echo no)"
+check "the job does not override its name (which would change the check name)" "yes" \
+  "$(awk -v j="$CI_JOB" '
+       $0 ~ "^  " j ":" {inj=1; next}
+       inj && /^  [A-Za-z0-9_-]+:/ {inj=0}
+       inj && /^    name:/ {found=1}
+       END {print (found ? "no" : "yes")}' .github/workflows/ci.yml)"
 
 [ "$fails" -eq 0 ] || exit 1
