@@ -11,11 +11,12 @@
 set -uo pipefail
 cd "$(dirname "$0")/../.."
 L=./tools/pool/lock.sh
+REPO=mule/asteroids-android-godot
 RUN_ID="${GITHUB_RUN_ID:-$$-$(date +%s%N)}"
 NS="selftest-locks-$RUN_ID"
 EMPTY_NS="selftest-locks-empty-$RUN_ID"
 KEY=probe-1
-SHA=$(gh api repos/mule/asteroids-android-godot/git/ref/heads/main -q .object.sha)
+SHA=$(gh api "repos/$REPO/git/ref/heads/main" -q .object.sha)
 fails=0
 check(){ if [ "$2" = "$3" ]; then echo "ok   - $1"; else echo "FAIL - $1: want $2 got $3"; fails=$((fails+1)); fi; }
 
@@ -27,6 +28,44 @@ cleanup() {
   return 0
 }
 trap cleanup EXIT
+
+# Probe write access before anything else, by attempting the exact write
+# every check below depends on: creating a throwaway ref in THIS RUN's own
+# unique namespace. Detecting this by probing -- not by sniffing $CI or
+# $GITHUB_ACTIONS -- means a developer machine whose token quietly lost
+# write scope fails loudly here too, instead of an environment-sniffing
+# skip hiding the exact case you most want to fail loudly.
+#
+# Only a clean HTTP 403 (gh's own "(HTTP nnn)" suffix on a failed request)
+# may turn this into a skip. Anything else -- network trouble, an expired
+# token, a 404 on the repo, a 500, a response this suite can't parse -- is
+# a real failure: skipping on an error the suite can't positively identify
+# as "permission denied" is exactly how a broken suite ends up reporting
+# green.
+probe_err=$(gh api "repos/$REPO/git/refs" -f ref="refs/$NS/__write-probe" -f sha="$SHA" 2>&1 1>/dev/null)
+probe_rc=$?
+if [ "$probe_rc" -eq 0 ]; then
+  $L release "$NS" "__write-probe" >/dev/null 2>&1 || true
+elif printf '%s' "$probe_err" | grep -q '(HTTP 403)'; then
+  {
+    echo "SKIP (exit 77): this token cannot write git refs in $REPO."
+    echo "  Attempted: create refs/$NS/__write-probe (POST git/refs)."
+    echo "  Result:    denied with HTTP 403."
+    echo "  tools/pool/lock.sh's compare-and-swap -- the actual mutex under"
+    echo "  test -- was NOT exercised in this environment. This is a skip,"
+    echo "  not a pass: none of the checks below ran."
+  } >&2
+  exit 77
+else
+  {
+    echo "FAIL: could not verify write access to $REPO's git refs, and the"
+    echo "  failure was not a clean HTTP 403 -- refusing to treat an"
+    echo "  unrecognised error as a permission-denied skip."
+    echo "  Attempted: create refs/$NS/__write-probe (POST git/refs)."
+    echo "  gh said: $probe_err"
+  } >&2
+  exit 1
+fi
 
 $L release "$NS" "$KEY" >/dev/null 2>&1
 

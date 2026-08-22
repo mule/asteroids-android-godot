@@ -41,11 +41,29 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           shopt -s nullglob
           scripts=(tests/pool/test_*.sh)
           if [ ${#scripts[@]} -eq 0 ]; then
             echo "FAIL: tests/pool/test_*.sh matched no files; treating an empty shell suite as a failure (fail closed)." >&2
             exit 1
           fi
-          for t in "${scripts[@]}"; do bash "$t"; done
+          # Exit 77 is a distinct, deliberate "SKIPPED" signal (see
+          # tests/pool/test_lock.sh's write-access probe): this repo's
+          # GH_TOKEN is read-only by policy, so that suite cannot exercise
+          # the mutex's actual compare-and-swap here. 0 stays a pass, 77 is
+          # logged loudly as a skip and does not fail the step, and any
+          # other non-zero still fails the step immediately -- same as
+          # before this existed.
+          for t in "${scripts[@]}"; do
+            bash "$t"
+            rc=$?
+            if [ "$rc" -eq 77 ]; then
+              echo "::warning::SKIPPED $t (exit 77) -- see its own output above for what could not be verified. This is NOT a pass."
+              continue
+            fi
+            if [ "$rc" -ne 0 ]; then
+              echo "FAIL: $t exited $rc" >&2
+              exit "$rc"
+            fi
+          done
