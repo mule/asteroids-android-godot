@@ -25,6 +25,8 @@ const ASTEROID_SMALL := 2
 @onready var player_ship: Area2D = $Entities/PlayerShip
 @onready var sector: Sector = $Sector
 @onready var follow_camera: Camera2D = $FollowCamera
+@onready var stars_far: Node2D = $StarsFar/Layer
+@onready var stars_mid: Node2D = $StarsMid/Layer
 @onready var player_input: Node = $PlayerInput
 @onready var feedback: Node = $Feedback
 @onready var hud: CanvasLayer = $Hud
@@ -56,6 +58,7 @@ func _ready() -> void:
 	_apply_lighting_to_entity(player_ship)
 	_apply_sector_bounds()
 	follow_camera.set_target(player_ship)
+	_build_star_layers()
 	if auto_start:
 		_start_new_game()
 
@@ -330,6 +333,17 @@ func _apply_sector_bounds_to_entity(entity: Node) -> void:
 
 	if entity.has_method("set_boundary_margin"):
 		entity.set_boundary_margin(sector.get_boundary_margin())
+
+
+func _build_star_layers() -> void:
+	var bounds := sector.get_bounds()
+	var sector_seed := random_seed
+
+	if sector.definition != null and "sector_seed" in sector.definition:
+		sector_seed = sector.definition.sector_seed
+
+	stars_far.build_stars(bounds, sector_seed + stars_far.layer_seed)
+	stars_mid.build_stars(bounds, sector_seed + stars_mid.layer_seed)
 
 
 func _on_hud_touch_action_changed(action: StringName, pressed: bool) -> void:

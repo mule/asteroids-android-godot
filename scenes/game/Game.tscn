@@ -1,4 +1,4 @@
-[gd_scene load_steps=22 format=3 uid="uid://bqsky4x01tinn"]
+[gd_scene load_steps=21 format=3 uid="uid://bqsky4x01tinn"]
 
 [ext_resource type="Script" path="res://scripts/game.gd" id="1_m6aai"]
 [ext_resource type="PackedScene" path="res://scenes/entities/PlayerShip.tscn" id="2_mgmqj"]
@@ -6,7 +6,7 @@
 [ext_resource type="PackedScene" path="res://scenes/entities/Bullet.tscn" id="4_1nphu"]
 [ext_resource type="PackedScene" path="res://scenes/ui/Hud.tscn" id="5_nl3g0"]
 [ext_resource type="Script" path="res://scripts/player_input.gd" id="6_8dbn6"]
-[ext_resource type="Script" path="res://scripts/starfield.gd" id="7_3jtpl"]
+[ext_resource type="Script" path="res://scripts/world/star_layer.gd" id="7_star_layer"]
 [ext_resource type="Script" path="res://scripts/feedback.gd" id="8_s7x2j"]
 [ext_resource type="Resource" path="res://assets/generated/asteroids/asteroid_baseline_01.tres" id="9_0bsm8"]
 [ext_resource type="Resource" path="res://assets/generated/asteroids/asteroid_cobalt_01.tres" id="10_xpoo4"]
@@ -14,7 +14,6 @@
 [ext_resource type="Resource" path="res://assets/generated/asteroids/asteroid_ice_01.tres" id="12_s7b4h"]
 [ext_resource type="Resource" path="res://assets/generated/asteroids/asteroid_iron_01.tres" id="13_m2hh0"]
 [ext_resource type="Resource" path="res://assets/generated/asteroids/asteroid_shale_01.tres" id="14_pdu2q"]
-[ext_resource type="Texture2D" path="res://assets/media/backgrounds/background_starfield_01.png" id="15_p0tjd"]
 [ext_resource type="Texture2D" path="res://assets/media/effects/effect_impact_flash_01.png" id="16_xask5"]
 [ext_resource type="AudioStream" path="res://assets/audio/sfx_shot_spark_01.wav" id="17_y3v2k"]
 [ext_resource type="AudioStream" path="res://assets/audio/sfx_impact_thump_01.wav" id="18_87qfr"]
@@ -29,20 +28,38 @@ asteroid_scene = ExtResource("3_tct56")
 bullet_scene = ExtResource("4_1nphu")
 asteroid_visual_assets = Array[Resource]([ExtResource("9_0bsm8"), ExtResource("10_xpoo4"), ExtResource("11_qkpjg"), ExtResource("12_s7b4h"), ExtResource("13_m2hh0"), ExtResource("14_pdu2q")])
 
-[node name="Background" type="ColorRect" parent="."]
-offset_right = 1152.0
-offset_bottom = 648.0
+[node name="DeepSpace" type="CanvasLayer" parent="."]
+layer = -100
+
+[node name="ColorRect" type="ColorRect" parent="DeepSpace"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 color = Color(0.0352941, 0.0392157, 0.0588235, 1)
 
-[node name="BackgroundTexture" type="TextureRect" parent="."]
-offset_right = 1152.0
-offset_bottom = 648.0
-mouse_filter = 2
-texture = ExtResource("15_p0tjd")
-stretch_mode = 1
+[node name="StarsFar" type="Parallax2D" parent="."]
+scroll_scale = Vector2(0.15, 0.15)
 
-[node name="Starfield" type="Node2D" parent="."]
-script = ExtResource("7_3jtpl")
+[node name="Layer" type="Node2D" parent="StarsFar"]
+script = ExtResource("7_star_layer")
+star_count = 420
+layer_seed = 404
+max_radius = 1.6
+min_alpha = 0.15
+max_alpha = 0.4
+
+[node name="StarsMid" type="Parallax2D" parent="."]
+scroll_scale = Vector2(0.4, 0.4)
+
+[node name="Layer" type="Node2D" parent="StarsMid"]
+script = ExtResource("7_star_layer")
+star_count = 260
+layer_seed = 405
+min_alpha = 0.3
+max_alpha = 0.7
 
 [node name="Sector" type="Node2D" parent="."]
 script = ExtResource("19_c1u4a")
