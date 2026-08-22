@@ -1,14 +1,32 @@
 #!/usr/bin/env bash
 # Integration test against real GitHub: ref creation is the mutex, so a
-# fake would test nothing. Uses a throwaway namespace and cleans up.
+# fake would test nothing. Every namespace this suite touches is derived
+# from a per-run id, so two runs in flight at once (a CI run overlapping a
+# local run, two pushes in quick succession, or two local runs started at
+# once) never collide on the same ref: $GITHUB_RUN_ID differs across CI
+# runs, and $$ plus a clock reading differs across local processes even
+# started in the same second. A trap releases everything this run created,
+# even if an assertion fails partway through, so the namespace never
+# accumulates litter under a name nobody can trace back to a run.
 set -uo pipefail
 cd "$(dirname "$0")/../.."
 L=./tools/pool/lock.sh
-NS=selftest-locks
+RUN_ID="${GITHUB_RUN_ID:-$$-$(date +%s%N)}"
+NS="selftest-locks-$RUN_ID"
+EMPTY_NS="selftest-locks-empty-$RUN_ID"
 KEY=probe-1
 SHA=$(gh api repos/mule/asteroids-android-godot/git/ref/heads/main -q .object.sha)
 fails=0
 check(){ if [ "$2" = "$3" ]; then echo "ok   - $1"; else echo "FAIL - $1: want $2 got $3"; fails=$((fails+1)); fi; }
+
+STUBDIR=""
+cleanup() {
+  $L gc "$NS" >/dev/null 2>&1 || true
+  $L gc "$EMPTY_NS" >/dev/null 2>&1 || true
+  [ -n "$STUBDIR" ] && rm -rf "$STUBDIR" 2>/dev/null
+  return 0
+}
+trap cleanup EXIT
 
 $L release "$NS" "$KEY" >/dev/null 2>&1
 
@@ -56,7 +74,7 @@ $L bogus-subcommand >/dev/null 2>&1; check "unknown subcommand exits 2" 2 $?
 # an empty namespace to every caller, including tools/implementer/ready.sh
 # -- an outage would then read as "nothing is locked" and let two agents
 # claim the same issue.
-check "held on a genuinely empty namespace exits 0" 0 "$($L held selftest-locks-truly-empty-ns >/dev/null 2>&1; echo $?)"
+check "held on a genuinely empty namespace exits 0" 0 "$($L held "$EMPTY_NS" >/dev/null 2>&1; echo $?)"
 
 STUBDIR=$(mktemp -d)
 REALGH=$(command -v gh)
@@ -71,5 +89,6 @@ chmod +x "$STUBDIR/gh"
 PATH="$STUBDIR:$PATH" $L held "$NS" >/dev/null 2>&1
 check "held propagates a failed gh api call as non-zero, not empty" 1 $?
 rm -rf "$STUBDIR"
+STUBDIR=""
 
 [ "$fails" -eq 0 ] || exit 1
