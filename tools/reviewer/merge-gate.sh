@@ -88,7 +88,27 @@ if [ -n "${GATE_FACTS:-}" ]; then
   changed_files=$(fact changed_files 0)
   additions=$(fact additions 0)
 else
-  SLUG="${REVIEW_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}"
+  # Which repo are we even deciding about. As a `${VAR:-$(...)}` default this
+  # aborted the whole script under `set -e` with no output at all when `gh`
+  # failed -- fail-closed, but an operator sees a pool that stopped merging and
+  # nothing saying why, which is only marginally better than one that continues
+  # wrongly. Same discipline as the two calls below: status first, then shape.
+  if [ -n "${REVIEW_REPO:-}" ]; then
+    SLUG="$REVIEW_REPO"
+  else
+    SLUG=""
+    slug_rc=0
+    SLUG=$(gh repo view --json nameWithOwner -q .nameWithOwner) || slug_rc=$?
+    if [ "$slug_rc" -ne 0 ]; then
+      echo "gate: 'gh repo view --json nameWithOwner' failed (exit $slug_rc) -> hold #$pr; cannot tell which repo to evaluate" >&2
+      exit 1
+    fi
+    case "$SLUG" in
+      */*) ;;
+      *) echo "gate: 'gh repo view --json nameWithOwner' gave '$SLUG' -> hold #$pr; that is not an owner/repo slug" >&2
+         exit 1 ;;
+    esac
+  fi
 
   # The namespace tools/reviewer/lease.sh's `mark-passed` writes into, via the
   # shared lock primitive in tools/pool/lock.sh (its `sha` subcommand owns the
@@ -217,10 +237,40 @@ else
     fi
   fi
 
+  # Human APPROVED reviews. A bare assignment aborted under `set -e` with no
+  # diagnostic; and had it not aborted, an error body in $approvals would have
+  # blown up the later `[ "$approvals" -ge 1 ]` instead. Capture the status,
+  # then insist the answer is actually a count.
+  approvals=""
+  approvals_rc=0
   approvals=$(gh pr view "$pr" --repo "$SLUG" --json reviews \
-    -q '[.reviews[] | select(.state=="APPROVED")] | length')
+    -q '[.reviews[] | select(.state=="APPROVED")] | length') || approvals_rc=$?
+  if [ "$approvals_rc" -ne 0 ]; then
+    echo "gate: 'gh pr view --json reviews' failed for #$pr (exit $approvals_rc) -> hold; the human approval count is unknown" >&2
+    exit 1
+  fi
+  case "$approvals" in
+    ''|*[!0-9]*)
+      echo "gate: 'gh pr view --json reviews' gave approvals='$approvals' for #$pr -> hold; that is not a count" >&2
+      exit 1 ;;
+  esac
 
-  labels=$(gh pr view "$pr" --repo "$SLUG" --json labels -q '[.labels[].name] | join(",")')
+  # The labels, and this is the one that matters most: every has_label call
+  # below reads this string, so an empty $labels is indistinguishable from a PR
+  # that genuinely carries no labels -- which would silently disarm `hold`, the
+  # operator's emergency brake, and `review-blocked`. Measured, the bare
+  # assignment did abort under `set -e` rather than continue (rc=1), so this was
+  # fail-closed, not fail-open; but it aborted with EMPTY stderr, so the brake
+  # looked identical to a merge gate that had simply crashed. An empty answer is
+  # NOT rejected here: a PR with no labels is ordinary and legitimate. Only a
+  # failed call is.
+  labels=""
+  labels_rc=0
+  labels=$(gh pr view "$pr" --repo "$SLUG" --json labels -q '[.labels[].name] | join(",")') || labels_rc=$?
+  if [ "$labels_rc" -ne 0 ]; then
+    echo "gate: 'gh pr view --json labels' failed for #$pr (exit $labels_rc) -> hold; the label state is unknown, so neither hold nor review-blocked can be trusted to be absent" >&2
+    exit 1
+  fi
 
   # The sign-off: a reviewer agent recorded a clean review at one exact head sha
   # via `lease.sh mark-passed`. Pinning to the sha is the whole point. The

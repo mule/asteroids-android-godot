@@ -143,7 +143,10 @@ cat > "$STUB/gh" <<'GH'
 args="$*"
 printf '%s\n' "gh $args" >> "$GH_CALLS"
 case "$args" in
-  *"repo view --json nameWithOwner"*) printf '%s\n' "mule/asteroids-android-godot" ;;
+  # Every query below can be made to FAIL while still writing to stdout, which
+  # is what `gh` really does with an error body.
+  *"repo view --json nameWithOwner"*)
+    printf '%s\n' "$FAKE_SLUG"; exit "$FAKE_SLUG_RC" ;;
   # Like the rollup query, this one can be made to FAIL while still writing to
   # stdout — which is what `gh` really does with an error body.
   *"--json author,changedFiles,additions,headRefOid,mergeStateStatus"*)
@@ -153,8 +156,8 @@ case "$args" in
   # the fail-closed rows below.
   *"--json statusCheckRollup"*)
     printf '%s\n' "$FAKE_ROLLUP"; exit "$FAKE_ROLLUP_RC" ;;
-  *"--json reviews"*) printf '%s\n' "$FAKE_APPROVALS" ;;
-  *"--json labels"*)  printf '%s\n' "$FAKE_LABELS" ;;
+  *"--json reviews"*) printf '%s\n' "$FAKE_APPROVALS"; exit "$FAKE_APPROVALS_RC" ;;
+  *"--json labels"*)  printf '%s\n' "$FAKE_LABELS";    exit "$FAKE_LABELS_RC" ;;
   *"git/ref/reviewer-passed/pr-99"*) printf '%s\n' "$FAKE_PASSED"; exit "$FAKE_PASSED_RC" ;;
   *) printf 'stub: unexpected gh %s\n' "$args" >&2; exit 1 ;;
 esac
@@ -181,7 +184,11 @@ live(){ # live <rollup> <labels> <passed-sha> <approvals> <merge_state> [passed-
          FAKE_APPROVALS="$4" FAKE_MERGE_STATE="$5" FAKE_PASSED_RC="${6:-0}" \
          FAKE_ROLLUP_RC="$rrc" \
          FAKE_PRVIEW="${LIVE_PRVIEW-octo 3 42 $HEAD $5}" \
-         FAKE_PRVIEW_RC="${LIVE_PRVIEW_RC:-0}"
+         FAKE_PRVIEW_RC="${LIVE_PRVIEW_RC:-0}" \
+         FAKE_SLUG="${LIVE_SLUG-mule/asteroids-android-godot}" \
+         FAKE_SLUG_RC="${LIVE_SLUG_RC:-0}" \
+         FAKE_APPROVALS_RC="${LIVE_APPROVALS_RC:-0}" \
+         FAKE_LABELS_RC="${LIVE_LABELS_RC:-0}"
   env -u GATE_FACTS PATH="$STUB:$PATH" $G 99 >/dev/null 2>"$STUB/err"
   echo $?
 }
@@ -327,6 +334,53 @@ check "live: pr-view working, approved + clean base still merges" 0 \
 check "live: pr-view working, the conflict guard still fires" 1 \
   "$(live 'tests=SUCCESS' 'approved' "" 0 DIRTY)"
 check "live: pr-view working, a review at head still merges" 0 \
+  "$(live 'tests=SUCCESS' 'review-passed' "$HEAD" 0 CLEAN)"
+
+# --- the last three un-hardened calls in the live path -----------------------
+# None of these fell through to a merge: measured on 1463413, each aborted under
+# `set -e` at rc=1. But each aborted with EMPTY stderr, so a pool that stopped
+# merging looked exactly like a pool that had crashed, and the `--json labels`
+# one is the query that gates `hold` -- the operator's emergency brake. Failing
+# closed is not enough; it has to say what failed.
+ERRBODY='{"message":"Bad credentials","status":"401"}'
+
+# `--json labels`. The PR really carries `hold`, so a run that lost the label
+# set and carried on would show up as a merge rather than a refusal.
+lbl_fail(){ LIVE_LABELS_RC=1 live 'tests=SUCCESS' "$ERRBODY" "$HEAD" 0 CLEAN; }
+check "live: a failed labels query holds" 1 "$(lbl_fail)"
+contains "live: and it names the labels query" "--json labels' failed" \
+  "$(cat "$STUB/err")"
+contains "live: and it says why that matters" "neither hold nor review-blocked" \
+  "$(cat "$STUB/err")"
+check "live: labels working, a hold label still blocks" 1 \
+  "$(live 'tests=SUCCESS' 'hold' "$HEAD" 0 CLEAN)"
+check "live: labels working, an unlabelled PR still merges" 0 \
+  "$(live 'tests=SUCCESS' '' "$HEAD" 0 CLEAN)"
+
+# `--json reviews`.
+rev_fail(){ LIVE_APPROVALS_RC=1 live 'tests=SUCCESS' 'review-passed' "$HEAD" "$ERRBODY" CLEAN; }
+check "live: a failed reviews query holds" 1 "$(rev_fail)"
+contains "live: and it names the reviews query" "--json reviews' failed" \
+  "$(cat "$STUB/err")"
+check "live: a non-numeric approval count holds" 1 \
+  "$(live 'tests=SUCCESS' 'review-passed' "$HEAD" 'null' CLEAN)"
+contains "live: and says that is not a count" "that is not a count" \
+  "$(cat "$STUB/err")"
+check "live: reviews working, a human approval still merges" 0 \
+  "$(live 'tests=SUCCESS' '' "" 1 CLEAN)"
+check "live: reviews working, zero approvals still needs a review" 2 \
+  "$(live 'tests=SUCCESS' '' "" 0 CLEAN)"
+
+# `gh repo view` for the repo slug.
+slug_fail(){ LIVE_SLUG_RC=1 LIVE_SLUG="$ERRBODY" live 'tests=SUCCESS' 'review-passed' "$HEAD" 0 CLEAN; }
+check "live: a failed repo-view query holds" 1 "$(slug_fail)"
+contains "live: and it names the repo-view query" "gh repo view --json nameWithOwner' failed" \
+  "$(cat "$STUB/err")"
+check "live: a slug that is not owner/repo holds" 1 \
+  "$(LIVE_SLUG="not-a-slug" live 'tests=SUCCESS' 'review-passed' "$HEAD" 0 CLEAN)"
+contains "live: and says it is not a slug" "not an owner/repo slug" \
+  "$(cat "$STUB/err")"
+check "live: repo view working, the gate still decides normally" 0 \
   "$(live 'tests=SUCCESS' 'review-passed' "$HEAD" 0 CLEAN)"
 
 [ "$fails" -eq 0 ] || exit 1
