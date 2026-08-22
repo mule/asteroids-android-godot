@@ -10,7 +10,11 @@
 #
 # Facts available to you (all already fetched below):
 #   $pr             PR number
-#   $checks         "pass" | "fail" | "pending" | "none"
+#   $checks         "pass" | "fail" | "pending" | "none". "pass" is stricter
+#                   than "the rollup is not red": it additionally requires the
+#                   `tests` check (the job in .github/workflows/ci.yml) to be
+#                   present and SUCCESS. A rollup of unrelated green checks
+#                   with no `tests` entry is "none", not "pass".
 #   $approvals      number of human APPROVED reviews
 #   $reviewed_sha   head sha a reviewer cleared, "" if it never cleared one
 #   $head_sha       head sha the PR is at right now
@@ -89,6 +93,54 @@ else
   elif grep -qiE 'FAILURE|ERROR|TIMED_OUT'     <<<"$rollup"; then checks="fail"
   elif grep -qiE 'PENDING|IN_PROGRESS|QUEUED'  <<<"$rollup"; then checks="pending"
   else                                              checks="pass"; fi
+
+  # The rollup above answers "is anything red or still running", which is not
+  # the same question as "did this repo's suite run and go green". A PR that
+  # carries one unrelated successful check and no `tests` entry at all produced
+  # checks=pass and merged — on a build that never happened. The whole autonomy
+  # argument is "green CI plus a higher-tier review", so the gate has to name
+  # the check it means.
+  #
+  # `tests` is the job id in .github/workflows/ci.yml, and with no `name:` on
+  # that job it is also the check-run name GitHub reports here (PR #67's rollup
+  # reads `tests:SUCCESS`).
+  #
+  # Second call rather than reworking the first: the two answers are different
+  # questions and this one must fail differently. `|| rollup_named=""` REPLACES
+  # the value instead of appending to it, because `gh` writes error bodies to
+  # stdout — a `|| echo ""` here would launder an error JSON into the check
+  # names and could match nothing while looking like a clean read.
+  rollup_named=$(gh pr view "$pr" --repo "$SLUG" --json statusCheckRollup \
+    -q '.statusCheckRollup[]? | "\(.name // .context)=\(.conclusion // .state // "")"') \
+    || rollup_named=""
+
+  # Every entry, not just the first: a re-run can leave two rows with this name
+  # and any non-SUCCESS among them means the suite is not green.
+  tests_seen=0
+  tests_green=1
+  while IFS= read -r entry; do
+    case "$entry" in
+      tests=*)
+        tests_seen=1
+        case "${entry#tests=}" in SUCCESS|success) ;; *) tests_green=0 ;; esac ;;
+    esac
+  done <<<"$rollup_named"
+
+  # An additional requirement, never a relaxation: this can only downgrade
+  # `pass`, never promote anything to it.
+  #   tests absent    -> "none". Absence of evidence, so it lands on the exit-2
+  #                      arm and a human's `approved` can still vouch for it.
+  #   tests not green -> "fail". Present and not SUCCESS is negative evidence,
+  #                      including SKIPPED and CANCELLED: a suite that did not
+  #                      finish is not a suite that passed, and no label gets
+  #                      to wave that through.
+  if [ "$checks" = "pass" ]; then
+    if [ "$tests_seen" -eq 0 ]; then
+      checks="none"
+    elif [ "$tests_green" -eq 0 ]; then
+      checks="fail"
+    fi
+  fi
 
   approvals=$(gh pr view "$pr" --repo "$SLUG" --json reviews \
     -q '[.reviews[] | select(.state=="APPROVED")] | length')
@@ -182,19 +234,41 @@ if has_label hold; then
   exit 1
 fi
 
-# Red checks veto outright. Anything that is not green is a wait, not a merge:
-# `none` used to fall through to a merge because this repo had no CI, which was
-# harmless when there was nothing that could have been green.
-# .github/workflows/ci.yml (job id `tests`) now runs on every pull_request, so
-# an empty check set no longer means "no CI exists", it means "the evidence has
-# not arrived" — and merging on absent evidence is merging on none. `pending`
-# waits for the same reason: a queued run is not a verdict. Both are exit 2
-# (come back later), not exit 1; only a red build is a human's problem.
-case "$checks" in
-  fail) echo "gate: checks=fail -> hold #$pr" >&2; exit 1 ;;
-  pass) ;;
-  *)    echo "gate: checks=$checks -> #$pr awaits a green build" >&2; exit 2 ;;
-esac
+# A red build vetoes outright, and NO label overrides it. `approved` is checked
+# below this, never above it.
+if [ "$checks" = "fail" ]; then
+  echo "gate: checks=fail -> hold #$pr" >&2
+  exit 1
+fi
+
+# `approved` sits BETWEEN the two check arms. That looks like an odd place to
+# put it and a later reader will want to tidy it upward or downward; both are
+# wrong, so here is the reasoning.
+#
+# The distinction the gate is drawing is absence of evidence versus presence of
+# negative evidence. `checks=none` and `checks=pending` are absence: nothing has
+# reported, so the automation cannot decide, and deciding is exactly what a
+# human sign-off is for. `checks=fail` is negative evidence: something reported,
+# and it reported red. A human may vouch for a signal that is missing. A human
+# may not wave through a signal that is actively saying no — that is not an
+# escape hatch, that is overriding the test suite by label.
+#
+# Move `approved` ABOVE the fail arm and a label merges a demonstrably red
+# build. Move it BELOW the not-pass arm and the fast path stops working
+# precisely when CI is absent or broken, which is when an escape hatch is for.
+# It belongs here, between them.
+#
+# This arm only lets execution continue. `approved` still has to reach the
+# sign-off chain below, so review-blocked and a conflicting base still hold an
+# approved PR exactly as they did before.
+if [ "$checks" != "pass" ]; then
+  if has_label approved; then
+    echo "gate: checks=$checks, vouched for by the approved label -> #$pr proceeds" >&2
+  else
+    echo "gate: checks=$checks -> #$pr awaits a green build" >&2
+    exit 2
+  fi
+fi
 
 # review-blocked means a human still owes an answer. `lease.sh mergeable`
 # already filters these out, but this is the irreversible step, so it re-checks

@@ -16,7 +16,9 @@
 # the message-text rows assert what the operator actually reads on stderr.
 set -uo pipefail
 cd "$(dirname "$0")/../.."
-G=./tools/reviewer/merge-gate.sh
+# Overridable so a reviewer can point the suite at an older revision of the
+# gate and watch the new rows fail. Defaults to the gate in the tree.
+G="${GATE_UNDER_TEST:-./tools/reviewer/merge-gate.sh}"
 fails=0
 check(){ if [ "$2" = "$3" ]; then echo "ok   - $1"; else echo "FAIL - $1: want '$2' got '$3'"; fails=$((fails+1)); fi; }
 contains(){ # contains <name> <needle> <haystack>
@@ -57,10 +59,27 @@ check "pending checks await a green build" 2 \
   "$(gate "checks=pending reviewed_sha=$HEAD head_sha=$HEAD")"
 contains "absent checks say what is missing" "awaits a green build" \
   "$(gate_err "checks=none reviewed_sha=$HEAD head_sha=$HEAD")"
-check "the approved label does not override red checks" 1 \
+# The four approved/checks combinations. `approved` sits between the two check
+# arms: it vouches for evidence that is MISSING, never for evidence that is red.
+check "approved + fail is still a hold" 1 \
   "$(gate "checks=fail labels=approved")"
-check "the approved label does not override an absent check set" 2 \
+check "approved + none merges on the human's word" 0 \
   "$(gate "checks=none labels=approved")"
+check "approved + pending merges on the human's word" 0 \
+  "$(gate "checks=pending labels=approved")"
+check "unapproved + none still awaits a green build" 2 \
+  "$(gate "checks=none labels=review-passed")"
+contains "the vouched-for merge says whose word it merged on" "vouched for by the approved label" \
+  "$(gate_err "checks=none labels=approved")"
+
+# `approved` was moved past the checks arm, NOT to the top of the table: the
+# structural vetoes below it still hold an approved PR.
+check "approved does not override review-blocked" 1 \
+  "$(gate "checks=none labels=approved,review-blocked")"
+check "approved does not override a conflicting base" 1 \
+  "$(gate "checks=none merge_state=DIRTY labels=approved")"
+check "hold still beats approved with no checks at all" 1 \
+  "$(gate "checks=none labels=approved,hold")"
 
 # --- the other pre-existing vetoes, unchanged --------------------------------
 check "review-blocked holds" 1 \
@@ -127,7 +146,12 @@ case "$args" in
   *"repo view --json nameWithOwner"*) printf '%s\n' "mule/asteroids-android-godot" ;;
   *"--json author,changedFiles,additions,headRefOid,mergeStateStatus"*)
     printf '%s\n' "octo 3 42 $FAKE_HEAD $FAKE_MERGE_STATE" ;;
-  *"--json statusCheckRollup"*) printf '%s\n' "$FAKE_ROLLUP" ;;
+  # Both rollup queries say "--json statusCheckRollup"; only the named one also
+  # mentions .name. Matching on ".name" alone would also swallow the labels
+  # query ([.labels[].name]) and the repo-view query (.nameWithOwner), which is
+  # exactly the kind of stub that answers the wrong question convincingly.
+  *"--json statusCheckRollup"*".name"*) printf '%s\n' "$FAKE_ROLLUP_NAMED" ;;
+  *"--json statusCheckRollup"*)         printf '%s\n' "$FAKE_ROLLUP" ;;
   *"--json reviews"*)           printf '%s\n' "$FAKE_APPROVALS" ;;
   *"--json labels"*)            printf '%s\n' "$FAKE_LABELS" ;;
   *"git/ref/reviewer-passed/pr-99"*) printf '%s\n' "$FAKE_PASSED"; exit "$FAKE_PASSED_RC" ;;
@@ -137,10 +161,19 @@ GH
 chmod +x "$STUB/gh"
 export GH_CALLS="$STUB/calls" FAKE_HEAD="$HEAD"
 
-live(){ # live <rollup> <labels> <passed-sha> <approvals> <merge_state> [passed-rc]
+live(){ # live <rollup> <labels> <passed-sha> <approvals> <merge_state> [passed-rc] [named-rollup]
   : > "$GH_CALLS"
+  # The named rollup defaults to agreeing with the anonymous one, so the rows
+  # that are not about the `tests` assertion do not have to restate it. An
+  # empty rollup means an empty check set, named or not.
+  local named
+  if [ "$#" -ge 7 ]; then named="$7"
+  elif [ -z "$1" ];  then named=""
+  else                    named="tests=SUCCESS"
+  fi
   export FAKE_ROLLUP="$1" FAKE_LABELS="$2" FAKE_PASSED="$3" \
-         FAKE_APPROVALS="$4" FAKE_MERGE_STATE="$5" FAKE_PASSED_RC="${6:-0}"
+         FAKE_APPROVALS="$4" FAKE_MERGE_STATE="$5" FAKE_PASSED_RC="${6:-0}" \
+         FAKE_ROLLUP_NAMED="$named"
   env -u GATE_FACTS PATH="$STUB:$PATH" $G 99 >/dev/null 2>"$STUB/err"
   echo $?
 }
@@ -162,5 +195,29 @@ check "live: a 404 on the sign-off ref is 'no review', not a sha" 2 \
   "$(live '"SUCCESS"' 'review-passed' '{"message":"Not Found"}' 0 CLEAN 1)"
 check "live: an impl-tier:3 PR finds no eligible reviewer" 2 \
   "$(live '"SUCCESS"' 'review-passed,impl-tier:3' "$HEAD" 0 CLEAN)"
+
+# --- the `tests` job must be named, not merely inferred from a green rollup ---
+# `tests` is the job id in .github/workflows/ci.yml, and with no `name:` on that
+# job it is also the check-run name GitHub reports.
+check "live: a green rollup WITHOUT a tests entry must not merge" 2 \
+  "$(live '"SUCCESS"' 'review-passed' "$HEAD" 0 CLEAN 0 'lint=SUCCESS')"
+contains "live: and it says the evidence is missing, not that it passed" "checks=none" \
+  "$(cat "$STUB/err")"
+check "live: a green rollup WITH a tests entry merges" 0 \
+  "$(live '"SUCCESS"' 'review-passed' "$HEAD" 0 CLEAN 0 'lint=SUCCESS
+tests=SUCCESS')"
+check "live: a red tests job is a hold even under a green-looking rollup" 1 \
+  "$(live '"SUCCESS"' 'review-passed' "$HEAD" 0 CLEAN 0 'tests=FAILURE')"
+check "live: a SKIPPED tests job did not pass" 1 \
+  "$(live '"SUCCESS"' 'review-passed' "$HEAD" 0 CLEAN 0 'tests=SKIPPED')"
+check "live: one green and one red tests row is not green" 1 \
+  "$(live '"SUCCESS"' 'review-passed' "$HEAD" 0 CLEAN 0 'tests=SUCCESS
+tests=FAILURE')"
+# A missing tests job is absence of evidence, so the human fast-path still works.
+check "live: approved rescues a rollup with no tests entry" 0 \
+  "$(live '"SUCCESS"' 'approved' "" 0 CLEAN 0 'lint=SUCCESS')"
+# ... but a red tests job is negative evidence, and no label overrides it.
+check "live: approved does not rescue a red tests job" 1 \
+  "$(live '"SUCCESS"' 'approved' "" 0 CLEAN 0 'tests=FAILURE')"
 
 [ "$fails" -eq 0 ] || exit 1
