@@ -55,9 +55,19 @@ jobs:
           # logged loudly as a skip and does not fail the step, and any
           # other non-zero still fails the step immediately -- same as
           # before this existed.
+          #
+          # GitHub Actions always runs a `run:` block as `bash -e {0}`
+          # *before* any `set` line inside the script gets to run -- our own
+          # `set -uo pipefail` above does not and cannot cancel that, since
+          # -e is independent of -u/pipefail and dropping it from our `set`
+          # line only means we never turned it BACK on, not that it was ever
+          # off. `bash "$t"` failing would therefore abort this whole step
+          # immediately under -e, before `rc=$?` or the checks below it ever
+          # ran -- so the command's failure must be exempted from -e via the
+          # standard `cmd || rc=$?` idiom, not a plain `cmd; rc=$?`.
           for t in "${scripts[@]}"; do
-            bash "$t"
-            rc=$?
+            rc=0
+            bash "$t" || rc=$?
             if [ "$rc" -eq 77 ]; then
               echo "::warning::SKIPPED $t (exit 77) -- see its own output above for what could not be verified. This is NOT a pass."
               continue
