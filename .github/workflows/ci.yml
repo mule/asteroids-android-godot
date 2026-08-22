@@ -38,6 +38,8 @@ jobs:
           python3 -m pytest tests/asset_pipeline -q
 
       - name: Shell suites
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           shopt -s nullglob
