@@ -30,6 +30,15 @@ checked out on that PR's head branch.
    own tier makes `reviewers-above <your tier>` empty, the gate returns 2, and
    the PR correctly waits for a human or a higher tier. That is the intended
    outcome, not a failure of your review.
+
+   **This is now enforced, not trusted.** `lease.sh claim` pinned the PR's head
+   sha in `refs/reviewer-locks/pr-<PR>`; `mark-passed` compares that pin with
+   the PR's current head, and when they differ — i.e. you pushed — it stamps
+   the roster's review tier itself and refuses to record the pass if the label
+   edit does not stick. Stamp it yourself anyway: the message you would
+   otherwise leave the tooling to write is part of your review. And because
+   `mark-passed` needs that pin, it also refuses to record a pass when you hold
+   no lease on the PR.
 6. Decide, and record the decision:
    - Clean, and you would defend every line of it →
      `./tools/reviewer/lease.sh mark-passed <PR>`. This records your pass

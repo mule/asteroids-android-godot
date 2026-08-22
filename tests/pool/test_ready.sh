@@ -91,4 +91,71 @@ check "Finding 3: a failed lock-listing API call prints nothing (fails closed)" 
 check "Finding 3:   ...and exits non-zero, not 0 with every lock ignored" 1 "$rc"
 rm -rf "$STUB3"
 
+
+# --- Final review: the open-PR exclusion must match CLOSING references ----
+# only, never a bare `#N` in prose. The old code grepped title+body for
+# `#[0-9]+`, so ONE open PR saying "Closes #47. Does not change #50 or #53"
+# excluded all three issues: a full ready set became empty output with rc=0,
+# which the coordinator brief reads as "nothing ready" -- an idle epic and a
+# starved queue are indistinguishable. This stub runs the REAL `-q` jq
+# expression ready.sh sends against a real PR-list JSON document, so it
+# exercises whatever fields the script actually asks for rather than a
+# pre-rendered string that would agree with any query.
+mkstub_prs() { # mkstub_prs <dir>  -- reads $PR_JSON from the environment
+  mkstub "$1" <<'STUBEOF'
+case "$args" in
+  "repo view --json nameWithOwner -q .nameWithOwner")
+    echo "mule/asteroids-android-godot" ;;
+  api\ repos/mule/asteroids-android-godot/git/matching-refs/implementer-locks/*)
+    exit 0 ;;
+  pr\ list\ --repo\ mule/asteroids-android-godot\ --state\ open*)
+    q=""; prev=""
+    for a in "$@"; do [ "$prev" = "-q" ] && q="$a"; prev="$a"; done
+    if [ -z "$q" ]; then echo "stub: no -q given to gh pr list" >&2; exit 9; fi
+    printf '%s' "$PR_JSON" | jq -r "$q" ;;
+  issue\ list\ --repo\ mule/asteroids-android-godot\ --state\ open*)
+    for n in 47 50 53; do
+      printf '%s\t%s\n' "$n" "$(printf 'Parent epic: #43\n' | base64 -w0)"
+    done ;;
+  *)
+    exec "$REAL" "$@" ;;
+esac
+STUBEOF
+}
+
+ready_with() { # ready_with <pr-list-json> -- prints ready.sh's stdout
+  local d; d=$(mktemp -d)
+  mkstub_prs "$d"
+  PR_JSON="$1" PATH="$d:$PATH" $READY 2>/dev/null
+  rm -rf "$d"
+}
+
+check "F1: a bare '#N' in prose does NOT exclude an issue" "47
+50
+53" \
+  "$(ready_with '[{"title":"chore: tidy","body":"Related to #47 and #50.","closingIssuesReferences":[]}]')"
+
+check "F1: the adversarial body excludes only the issue it CLOSES" "50
+53" \
+  "$(ready_with '[{"title":"chore: tidy","body":"Closes #47. Does not change #50 or #53","closingIssuesReferences":[{"number":47}]}]')"
+
+check "F1: a genuine closing keyword still excludes its issue" "47
+53" \
+  "$(ready_with '[{"title":"feat: thing","body":"Fixes #50","closingIssuesReferences":[]}]')"
+
+check "F1: every closing-keyword variant is honoured" "47" \
+  "$(ready_with '[{"title":"a","body":"resolved #50"},{"title":"b","body":"FIXED: #53"}]')"
+
+# The PR's own recorded link is the second source, and the only one that
+# survives a PR whose body never spells the keyword out. A title alone is
+# NOT a source: titles are prose too.
+check "F1: a PR's recorded closingIssuesReferences excludes its issue" "47
+50" \
+  "$(ready_with '[{"title":"wip","body":"see the linked issue","closingIssuesReferences":[{"number":53}]}]')"
+
+check "F1: a '#N' in the TITLE alone excludes nothing" "47
+50
+53" \
+  "$(ready_with '[{"title":"follow-up to #47","body":"no closing keyword here","closingIssuesReferences":[]}]')"
+
 [ "$fails" -eq 0 ] || exit 1

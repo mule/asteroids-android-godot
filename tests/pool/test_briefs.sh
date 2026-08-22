@@ -121,6 +121,43 @@ for f in "${files[@]}"; do
   echo "ok   - $f: $fences fenced block(s), $shell shell block(s) parsed"
 done
 
+# --- The delivery contract, in BOTH coordinator briefs -----------------------
+# `bash -n` cannot see this one, and it is the defect that actually happened:
+# waiting with `check --wait --types ...` filters WAKE-UPS, not consumption, so
+# a batch whose head is a heartbeat is never woken for, never consumed, and
+# never acknowledged. That starved the reviewer pool for 630 s on run 18 while
+# consecutive scheduled runs reported "no progress" on finished work. The fix
+# was written into the implementer brief and never back-ported to the reviewer
+# one, which is the LIVE pool -- so assert it on both, together, and keep them
+# from drifting apart again.
+#
+# The literal string "check --wait --types" also appears in the WARNING both
+# briefs carry ("Never write `check --wait --types ...`"), so the instruction
+# is matched by its `orca orchestration` prefix, which the warning does not
+# have.
+for f in tools/implementer/COORDINATOR.md tools/reviewer/COORDINATOR.md; do
+  if grep -q 'orchestration check --wait --types' "$f"; then
+    echo "FAIL - $f: still instructs a type-filtered wait ('orca orchestration check --wait --types'); --types filters wake-ups, not consumption -- this is the 630s production deadlock"
+    fails=$((fails + 1))
+  else
+    echo "ok   - $f: no type-filtered wait is instructed"
+  fi
+
+  if grep -q 'check --ack' "$f"; then
+    echo "ok   - $f: acknowledges the delivery with 'check --ack'"
+  else
+    echo "FAIL - $f: never runs 'check --ack <deliveryId>'; an unacknowledged batch is replayed forever and the queue stops moving"
+    fails=$((fails + 1))
+  fi
+
+  if grep -q 'what wakes a waiter' "$f"; then
+    echo "ok   - $f: states that --types filters wake-ups, not consumption"
+  else
+    echo "FAIL - $f: does not state that --types selects only what wakes a waiter; without that a reader re-adds the filter"
+    fails=$((fails + 1))
+  fi
+done
+
 if [ "$total_shell" -eq 0 ]; then
   echo "FAIL - parsed 0 shell blocks across ${#files[@]} brief(s); a linter that lints nothing reports success while doing nothing"
   fails=$((fails + 1))

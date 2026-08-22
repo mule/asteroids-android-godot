@@ -2,7 +2,8 @@
 # Print epic child issues that are claimable right now, ascending.
 #
 # An issue is claimable when it is open, belongs to the epic, carries neither
-# impl-blocked nor hold, has no open PR, is unlocked, and every issue named
+# impl-blocked nor hold, is named by no open PR's closing reference, is
+# unlocked, and every issue named
 # in its `## Dependencies` section is CLOSED. Strict by design: implementers
 # always build on merged code, so parallelism comes from the width of the
 # dependency graph rather than from speculating on unmerged branches.
@@ -48,16 +49,38 @@ fi
 # point -- the only failure mode worth guarding against was the fetch above.
 locked=" $(printf '%s\n' "$locked_raw" | sed 's/^issue-//' | tr '\n' ' ') "
 
-if ! pr_text_raw="$(gh pr list --repo "$SLUG" --state open --limit 100 --json body,title \
-                       -q '.[] | "\(.title) \(.body)"')"; then
+# Two sources of "an open PR already covers this issue", and ONLY two:
+#
+#   1. a genuine GitHub closing reference in the PR body -- one of the
+#      documented closing keywords (close/closes/closed, fix/fixes/fixed,
+#      resolve/resolves/resolved) immediately followed by `#N`;
+#   2. the PR's own recorded link, `closingIssuesReferences`, which is what
+#      GitHub itself resolved those keywords (or a manual link) to.
+#
+# A BARE `#N` anywhere in prose is NOT one of them, and neither is anything
+# in the title. This used to scan title+body for `#[0-9]+`, so a body that
+# said "Closes #47. Does not change #50 or #53" excluded all THREE issues
+# and turned a full ready set into an empty one -- exit 0, no output,
+# indistinguishable from an idle epic. That is live starvation, not a
+# conservative guess: an issue nobody is working on reads as taken because
+# some unrelated PR mentioned its number in passing.
+#
+# `closingIssuesReferences` is emitted below as synthetic "Closes #N" text
+# so one regex covers both sources.
+if ! pr_text_raw="$(gh pr list --repo "$SLUG" --state open --limit 100 \
+                       --json body,closingIssuesReferences \
+                       -q '.[] | (.body // ""), ([.closingIssuesReferences[]?.number] | map("Closes #\(.)") | join(" "))')"; then
   echo "ready.sh: failed to list open PRs (gh error) - refusing to report readiness" >&2
   exit 1
 fi
-# Here `grep -oE` finding zero matches (no open PR mentions any issue
-# number -- the common case) is a legitimate "nothing found" exit 1, not a
-# fetch failure, so it's safe to swallow with "|| true" now that the fetch
-# itself is already known-good.
-linked=" $(printf '%s\n' "$pr_text_raw" | grep -oE '#[0-9]+' | tr -d '#' | sort -u | tr '\n' ' ' || true) "
+# Here `grep` finding zero matches (no open PR closes any issue -- the
+# common case) is a legitimate "nothing found" exit 1, not a fetch failure,
+# so it's safe to swallow with "|| true" now that the fetch itself is
+# already known-good.
+CLOSING_RE='(^|[^[:alnum:]_])(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]:]*#[0-9]+'
+linked=" $(printf '%s\n' "$pr_text_raw" \
+           | grep -oiE "$CLOSING_RE" \
+           | grep -oE '[0-9]+' | sort -u | tr '\n' ' ' || true) "
 
 gh issue list --repo "$SLUG" --state open --limit 100 \
   --json number,body,labels \

@@ -349,11 +349,10 @@ tier_ok() {
 # APPROVED review. A brake that another label can override is not a brake.
 #
 # Its scope, stated accurately so the next reader is not misled: this stops the
-# MERGE and only the merge. tools/reviewer/lease.sh's claimable() filters
-# `review-blocked` and drafts, not `hold`, so a held PR is still claimed,
-# reviewed, commented on and pushed to — the pool keeps working on it, it just
-# never lands. Whether claimable() should honour `hold` too is an open design
-# question and is deliberately not answered here.
+# MERGE. tools/reviewer/lease.sh's claimable() now excludes `hold` as well, so
+# a held PR is no longer claimed, reviewed, commented on or pushed to either —
+# the brake stops the work and the merge. These two filters are the same rule
+# in two places: if one ever learns a new stop-label, so must the other.
 if has_label hold; then
   echo "gate: hold label -> hold #$pr; an operator stopped this one, remove the label to release it" >&2
   exit 1
