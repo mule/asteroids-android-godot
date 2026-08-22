@@ -8,6 +8,12 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # GODOT_BIN lives at job level, not per-step: every step in this job
+    # (including "Shell suites", which shells out to run_godot_test.sh via
+    # tests/pool/test_run_godot_test.sh) needs the same binary location.
+    # Repeating it per-step is how the "Shell suites" step lost it before.
+    env:
+      GODOT_BIN: ${{ github.workspace }}/.godot-bin/godot
     steps:
       - uses: actions/checkout@v4
 
@@ -18,18 +24,18 @@ jobs:
           curl -fsSL -o godot.zip \
             "https://github.com/godotengine/godot/releases/download/${V}-stable/Godot_v${V}-stable_linux.x86_64.zip"
           unzip -q godot.zip
-          mkdir -p "$HOME/.local/bin"
-          mv Godot_v${V}-stable_linux.x86_64 "$HOME/.local/bin/godot"
-          chmod +x "$HOME/.local/bin/godot"
+          mkdir -p "$(dirname "$GODOT_BIN")"
+          mv "Godot_v${V}-stable_linux.x86_64" "$GODOT_BIN"
+          chmod +x "$GODOT_BIN"
 
       - name: Import project resources
-        run: $HOME/.local/bin/godot --headless --path . --quit || true
+        run: $GODOT_BIN --headless --path . --quit || true
 
       - name: Godot suites
         run: |
           set -euo pipefail
           for t in tests/test_*.gd; do
-            GODOT_BIN="$HOME/.local/bin/godot" ./tools/tests/run_godot_test.sh "$t" 300
+            ./tools/tests/run_godot_test.sh "$t" 300
           done
 
       - name: Python suites
