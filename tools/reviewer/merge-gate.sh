@@ -96,9 +96,40 @@ else
   NS_PASSED=reviewer-passed
   export POOL_REPO="$SLUG"
 
-  read -r author changed_files additions head_sha merge_state <<<"$(gh pr view "$pr" --repo "$SLUG" \
+  # The PR's own facts. This is the sibling of the rollup call below and it had
+  # the same fail-open: `read <<<"$(gh ...)"` throws the exit status away, and
+  # since `gh` writes its error body to STDOUT, `read` happily split
+  # `{"message":"Bad credentials",...}` across the five variables. $head_sha and
+  # $merge_state came out empty, the DIRTY|BEHIND conflict guard then matched
+  # nothing, and an `approved` PR merged at rc=0 onto a base it conflicts with.
+  # Narrower than the rollup hole -- it needs a human label -- but identical in
+  # kind, so it gets identical treatment: capture the status, and on non-zero
+  # refuse without parsing the output at all.
+  pr_facts=""
+  pr_facts_rc=0
+  pr_facts=$(gh pr view "$pr" --repo "$SLUG" \
     --json author,changedFiles,additions,headRefOid,mergeStateStatus \
-    -q '"\(.author.login) \(.changedFiles) \(.additions) \(.headRefOid) \(.mergeStateStatus)"')"
+    -q '"\(.author.login) \(.changedFiles) \(.additions) \(.headRefOid) \(.mergeStateStatus)"') \
+    || pr_facts_rc=$?
+  if [ "$pr_facts_rc" -ne 0 ]; then
+    echo "gate: 'gh pr view --json author,changedFiles,additions,headRefOid,mergeStateStatus' failed for #$pr (exit $pr_facts_rc) -> hold; its output is an error body, not a PR state, and unknown is not mergeable" >&2
+    exit 1
+  fi
+  if [ -z "$pr_facts" ]; then
+    echo "gate: 'gh pr view --json author,changedFiles,additions,headRefOid,mergeStateStatus' returned nothing for #$pr -> hold; the PR's head sha and merge state are unknown" >&2
+    exit 1
+  fi
+  read -r author changed_files additions head_sha merge_state <<<"$pr_facts"
+
+  # A zero exit is not proof the answer is usable. If the template renders
+  # `null` for a field GitHub could not resolve, the line parses fine and the
+  # conflict guard is bypassed exactly as it was on an outright failure -- the
+  # same hole, one door over. A head that is not a sha, or an empty merge
+  # state, means this PR's state is unknown.
+  if ! grep -qE '^[0-9a-f]{40}$' <<<"$head_sha" || [ -z "$merge_state" ]; then
+    echo "gate: 'gh pr view' gave head='$head_sha' mergeStateStatus='$merge_state' for #$pr -> hold; that is not a usable PR state" >&2
+    exit 1
+  fi
 
   # ONE rollup query serving both classifiers below, because they read the same
   # object and one call means one exit status to get right.

@@ -144,8 +144,10 @@ args="$*"
 printf '%s\n' "gh $args" >> "$GH_CALLS"
 case "$args" in
   *"repo view --json nameWithOwner"*) printf '%s\n' "mule/asteroids-android-godot" ;;
+  # Like the rollup query, this one can be made to FAIL while still writing to
+  # stdout — which is what `gh` really does with an error body.
   *"--json author,changedFiles,additions,headRefOid,mergeStateStatus"*)
-    printf '%s\n' "octo 3 42 $FAKE_HEAD $FAKE_MERGE_STATE" ;;
+    printf '%s\n' "$FAKE_PRVIEW"; exit "$FAKE_PRVIEW_RC" ;;
   # One rollup query now. It can be made to FAIL while still writing to stdout,
   # which is what `gh` really does with an error body and is the whole point of
   # the fail-closed rows below.
@@ -172,9 +174,14 @@ live(){ # live <rollup> <labels> <passed-sha> <approvals> <merge_state> [passed-
   else
     rollup=$(printf '%s\n' "$1" | awk -F= '{printf "%s\t%s\n", $1, $2}')
   fi
+  # LIVE_PRVIEW / LIVE_PRVIEW_RC let a caller break the pr-view query without
+  # another positional argument. Unset, they render the ordinary answer, so
+  # every existing row is untouched.
   export FAKE_ROLLUP="$rollup" FAKE_LABELS="$2" FAKE_PASSED="$3" \
          FAKE_APPROVALS="$4" FAKE_MERGE_STATE="$5" FAKE_PASSED_RC="${6:-0}" \
-         FAKE_ROLLUP_RC="$rrc"
+         FAKE_ROLLUP_RC="$rrc" \
+         FAKE_PRVIEW="${LIVE_PRVIEW-octo 3 42 $HEAD $5}" \
+         FAKE_PRVIEW_RC="${LIVE_PRVIEW_RC:-0}"
   env -u GATE_FACTS PATH="$STUB:$PATH" $G 99 >/dev/null 2>"$STUB/err"
   echo $?
 }
@@ -291,5 +298,35 @@ check "the job does not override its name (which would change the check name)" "
        inj && /^  [A-Za-z0-9_-]+:/ {inj=0}
        inj && /^    name:/ {found=1}
        END {print (found ? "no" : "yes")}' .github/workflows/ci.yml)"
+
+# --- the sibling fail-open: the pr-view query -------------------------------
+# `read -r ... <<<"$(gh pr view ...)"` threw the call's exit status away. `gh`
+# writes its error body to stdout, so `read` split that body across the five
+# variables: $head_sha and $merge_state came out empty, the DIRTY|BEHIND
+# conflict guard matched nothing, and an `approved` PR merged at rc=0 onto a
+# base it conflicts with. Same family as the rollup hole, one call over.
+pv_fail(){ # pv_fail <labels> [merge_state]
+  LIVE_PRVIEW_RC=1 LIVE_PRVIEW='{"message":"Bad credentials","status":"401"}' \
+    live 'tests=SUCCESS' "$1" "$HEAD" 0 "${2:-DIRTY}"
+}
+check "live: a failed pr-view query holds even with approved" 1 "$(pv_fail approved)"
+check "live: a failed pr-view query holds without approved too" 1 "$(pv_fail review-passed)"
+contains "live: and it names the query that failed" "author,changedFiles,additions,headRefOid,mergeStateStatus" \
+  "$(cat "$STUB/err")"
+check "live: an empty pr-view response holds" 1 \
+  "$(LIVE_PRVIEW='' live 'tests=SUCCESS' 'approved' "$HEAD" 0 CLEAN)"
+# A zero exit is not proof the answer is usable: `null` fields parse fine and
+# bypass the conflict guard exactly as an outright failure did.
+check "live: a null head sha holds" 1 \
+  "$(LIVE_PRVIEW="octo 3 42 null CLEAN" live 'tests=SUCCESS' 'approved' "$HEAD" 0 CLEAN)"
+check "live: a null merge state holds" 1 \
+  "$(LIVE_PRVIEW="octo 3 42 $HEAD " live 'tests=SUCCESS' 'approved' "$HEAD" 0 CLEAN)"
+# Controls: the query working must still decide exactly as before.
+check "live: pr-view working, approved + clean base still merges" 0 \
+  "$(live 'tests=SUCCESS' 'approved' "" 0 CLEAN)"
+check "live: pr-view working, the conflict guard still fires" 1 \
+  "$(live 'tests=SUCCESS' 'approved' "" 0 DIRTY)"
+check "live: pr-view working, a review at head still merges" 0 \
+  "$(live 'tests=SUCCESS' 'review-passed' "$HEAD" 0 CLEAN)"
 
 [ "$fails" -eq 0 ] || exit 1
