@@ -4,15 +4,19 @@
 # still letting one provider fill both roles at different effort levels.
 #
 # Orca's worker-start --model/--effort covers Claude, Codex and Cursor only.
-# Antigravity's and opencode-go's models are declared here but configured on
-# their own side; Orca cannot pin them per launch.
+# Antigravity's model is declared here but configured on its own side; Orca
+# cannot pin it per launch.
+#
+# Every `agent` below must be an agent CONFIGURED IN ORCA, not merely a binary
+# on PATH. `worker-start --agent <id>` validates against Orca's configured
+# agents and rejects anything else with `agent_unconfigured`, which costs a
+# claim every scheduled run. tests/pool/test_roster.sh enforces this.
 #
 # Tier 1 takes the mechanical, well-specified issues. Tier 2 takes the ones
 # whose difficulty is algorithmic rather than large: AI steering, simulation
 # budgets, physics integration, device profiling. Routing is by `agent:<id>`
 # label on the issue; unlabelled issues fall to the lowest tier.
 implement	antigravity	3.7-flash	-	1
-implement	opencode-go	-	-	1
 implement	claude	opus	high	2
 implement	codex	gpt-5.5	high	2
 review	claude	opus	max	3
