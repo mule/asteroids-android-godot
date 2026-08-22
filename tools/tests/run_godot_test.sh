@@ -10,9 +10,25 @@
 # inspect a non-zero exit code, and `-e` would abort before it could.
 set -uo pipefail
 
-GODOT="${GODOT_BIN:-/home/japurane/.local/bin/godot}"
 script="${1:?usage: run_godot_test.sh <script-path> [timeout-seconds]}"
 limit="${2:-180}"
+
+# Resolve the Godot binary: prefer an explicit GODOT_BIN, else whatever
+# `godot` resolves to on PATH. No developer's own machine path is hardcoded
+# here as a fallback -- that only works by accident on the one machine it
+# names and fails confusingly (a bare "no such file" deep inside `timeout`)
+# everywhere else, CI included. If neither source yields an executable,
+# fail loudly and name both things that were tried: a quiet or garbled
+# failure here is exactly the "green means nothing ran" shape this test
+# runner exists to prevent.
+if [ -n "${GODOT_BIN:-}" ] && [ -x "${GODOT_BIN}" ]; then
+  GODOT="$GODOT_BIN"
+elif command -v godot >/dev/null 2>&1; then
+  GODOT="$(command -v godot)"
+else
+  echo "FAIL $script: no Godot binary found. Tried \$GODOT_BIN=\"${GODOT_BIN:-<unset>}\" (not an executable file) and 'command -v godot' on PATH (not found)." >&2
+  exit 1
+fi
 log=$(mktemp)
 importlog=$(mktemp)
 trap 'rm -f "$log" "$importlog"' EXIT

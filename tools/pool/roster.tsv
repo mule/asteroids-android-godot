@@ -1,0 +1,10 @@
+# role	agent	model	effort	tier
+# A PR may only be reviewed by a row whose tier is strictly greater than the
+# tier that built it. That keeps a model from clearing its own work while
+# still letting one provider fill both roles at different effort levels.
+#
+# Orca's worker-start --model/--effort covers Claude, Codex and Cursor only.
+# Antigravity's model is declared here but configured on antigravity's side.
+implement	antigravity	3.7-flash	-	1
+implement	claude	opus	high	2
+review	claude	opus	max	3

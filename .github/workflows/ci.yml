@@ -1,0 +1,85 @@
+name: tests
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # GODOT_BIN lives at job level, not per-step: every step in this job
+    # (including "Shell suites", which shells out to run_godot_test.sh via
+    # tests/pool/test_run_godot_test.sh) needs the same binary location.
+    # Repeating it per-step is how the "Shell suites" step lost it before.
+    env:
+      GODOT_BIN: ${{ github.workspace }}/.godot-bin/godot
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot 4.7.1
+        run: |
+          set -euo pipefail
+          V=4.7.1
+          curl -fsSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${V}-stable/Godot_v${V}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          mkdir -p "$(dirname "$GODOT_BIN")"
+          mv "Godot_v${V}-stable_linux.x86_64" "$GODOT_BIN"
+          chmod +x "$GODOT_BIN"
+
+      - name: Import project resources
+        run: $GODOT_BIN --headless --path . --quit || true
+
+      - name: Godot suites
+        run: |
+          set -euo pipefail
+          for t in tests/test_*.gd; do
+            ./tools/tests/run_godot_test.sh "$t" 300
+          done
+
+      - name: Python suites
+        run: |
+          python3 -m pip install --quiet pytest
+          python3 -m pytest tests/asset_pipeline -q
+
+      - name: Shell suites
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          shopt -s nullglob
+          scripts=(tests/pool/test_*.sh)
+          if [ ${#scripts[@]} -eq 0 ]; then
+            echo "FAIL: tests/pool/test_*.sh matched no files; treating an empty shell suite as a failure (fail closed)." >&2
+            exit 1
+          fi
+          # Exit 77 is a distinct, deliberate "SKIPPED" signal (see
+          # tests/pool/test_lock.sh's write-access probe): this repo's
+          # GH_TOKEN is read-only by policy, so that suite cannot exercise
+          # the mutex's actual compare-and-swap here. 0 stays a pass, 77 is
+          # logged loudly as a skip and does not fail the step, and any
+          # other non-zero still fails the step immediately -- same as
+          # before this existed.
+          #
+          # GitHub Actions always runs a `run:` block as `bash -e {0}`
+          # *before* any `set` line inside the script gets to run -- our own
+          # `set -uo pipefail` above does not and cannot cancel that, since
+          # -e is independent of -u/pipefail and dropping it from our `set`
+          # line only means we never turned it BACK on, not that it was ever
+          # off. `bash "$t"` failing would therefore abort this whole step
+          # immediately under -e, before `rc=$?` or the checks below it ever
+          # ran -- so the command's failure must be exempted from -e via the
+          # standard `cmd || rc=$?` idiom, not a plain `cmd; rc=$?`.
+          for t in "${scripts[@]}"; do
+            rc=0
+            bash "$t" || rc=$?
+            if [ "$rc" -eq 77 ]; then
+              echo "::warning::SKIPPED $t (exit 77) -- see its own output above for what could not be verified. This is NOT a pass."
+              continue
+            fi
+            if [ "$rc" -ne 0 ]; then
+              echo "FAIL: $t exited $rc" >&2
+              exit "$rc"
+            fi
+          done
