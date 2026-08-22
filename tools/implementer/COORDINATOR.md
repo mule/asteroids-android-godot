@@ -99,11 +99,18 @@ if ! HELD_RAW=$(./tools/pool/lock.sh held implementer-locks); then
   # "nothing is held". Treating an outage as an empty lock set is exactly
   # how two agents claim the same issue.
   echo "coordinator: cannot read implementer-locks; claiming nothing this run" >&2
-  # -> claim nothing, go to step 9 and report this.
+  exit 1   # STOP. Go to step 9 and report this. Do not fall through.
 fi
 HELD=$(printf '%s' "$HELD_RAW" | grep -c . || true)
 BUDGET=$(( MAX - HELD ))
 ```
+
+That `exit 1` is load-bearing, not decoration. Without it the block falls
+through, `HELD_RAW` is empty, `HELD` becomes 0, `BUDGET` becomes `MAX`, and you
+claim a full fleet against a lock state you could not read. Non-zero from
+`held` means the lock state is **unknown**, not empty, and claiming against an
+unknown lock state is exactly how two agents land on the same issue. Whatever
+shape you run this in, the failure path must terminate the run.
 
 Do **not** write `HELD=$(./tools/pool/lock.sh held ... | wc -l)`. The pipe
 discards `held`'s exit status, so an API outage silently becomes `HELD=0` and
@@ -280,12 +287,15 @@ Repeat until every dispatch you started has settled:
    No `--types`. 900000 ms (15 min) is a reasonable slice; use rolling slices
    rather than one enormous timeout.
 
-2. Parse the output **line by line**. It is JSON Lines, not one JSON document:
-   keepalive objects are emitted roughly every 15 s while waiting, followed by
-   the final result object. Drop keepalives with
-   `jq -c 'select(._keepalive|not)'` and take the last remaining object as the
-   result. **Never pipe `check --wait` through `head`** — SIGPIPE truncates the
-   event stream mid-delivery.
+2. Parse the output **line by line**, not as one JSON document. While waiting,
+   `check` emits JSON keepalive lines **to stderr** roughly every 15 s (per
+   `orca orchestration check --help`); the result object arrives on stdout. So
+   reading stdout alone already gives you the result. If you merge the streams
+   with `2>&1`, you get JSON Lines and must drop the keepalives with
+   `jq -c 'select(._keepalive|not)'`, taking the last remaining object as the
+   result. `_keepalive` is unrelated to a `heartbeat` message; `_heartbeat` is
+   a deprecated alias for the same keepalive. **Never pipe `check --wait`
+   through `head`** — SIGPIPE truncates the event stream mid-delivery.
 
 3. Process **every** message in the returned delivery, not only the interesting
    ones:
@@ -331,6 +341,15 @@ recovery action in its receipt. Do not substitute `orca terminal close`.
 ---
 
 ## Step 9 — Report
+
+**Before you report, audit your own locks.** There is an irreducible window
+between `claim` and `note` in step 5 where a crash leaves a lock with no lease
+marker, and `sweep` can never break such a lock (it has no age). So for every
+key `./tools/pool/lock.sh held implementer-locks` still lists, check
+`./tools/pool/lock.sh stamp <n>` — if it prints nothing, that lock is
+unsweepable: run `./tools/pool/lock.sh release implementer-locks issue-<n>`
+and say so in the report. Do this only for keys whose issue you handled this
+run; never touch another coordinator's lock.
 
 Report, in plain text:
 

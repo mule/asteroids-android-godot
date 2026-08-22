@@ -27,11 +27,20 @@ report. Never guess, and never work around a script by doing its job by hand.
 
 ```bash
 export POOL_REPO=mule/asteroids-android-godot
-LEASE_START=$(date -u +%s)   # remember this; you need it at step 7
-date -u
+date -u +%s > /tmp/impl-lease-start-<ISSUE>
+echo "lease started: $(date -u)"
+echo "give-up deadline: $(date -u -d "@$(( $(cat /tmp/impl-lease-start-<ISSUE>) + 3600 ))")"
 ```
 
-**You have 60 minutes from now.** That deadline is a hard rule, not a
+The start time goes to a **file**, not to a shell variable. Each command you
+run is a fresh shell, so a variable set here is gone by step 7 — a remembered
+`LEASE_START` reads as empty there, the elapsed time computes as ~29 million
+minutes, and you would take the give-up path on your very first check.
+
+Write down the printed `give-up deadline` timestamp and carry it in your own
+notes as well, so you have it even if the file is lost.
+
+**You have 60 minutes from that start.** That deadline is a hard rule, not a
 suggestion — see step 7.
 
 ---
@@ -167,11 +176,17 @@ Take this path if **any** of the following is true:
 - The Godot suites will not pass and you cannot fix them.
 - The issue is ambiguous, contradicts the epic design, or its
   `## Interfaces produced` cannot be satisfied as written.
-- **60 minutes have elapsed since `LEASE_START` in step 0.** Check it:
+- **60 minutes have elapsed since the start time you recorded in step 0.**
+  Check it by reading the file back — never from a remembered shell variable,
+  which does not survive between commands:
 
   ```bash
-  echo "elapsed_minutes=$(( ( $(date -u +%s) - LEASE_START ) / 60 ))"
+  echo "elapsed_minutes=$(( ( $(date -u +%s) - $(cat /tmp/impl-lease-start-<ISSUE>) ) / 60 ))"
   ```
+
+  If that file is missing (`cat` fails), fall back to the `give-up deadline`
+  timestamp you wrote down in step 0 and compare `date -u` against it. Do not
+  treat a missing file as an expired deadline.
 
   At 60 minutes you stop, whatever state you are in. **Do not grind past the
   deadline.** The lease TTL is 90 minutes; the 30-minute margin exists so you
