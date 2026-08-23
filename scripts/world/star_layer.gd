@@ -28,7 +28,22 @@ var random := RandomNumberGenerator.new()
 ## `bounds.size` rather than `bounds.size - view_size` for the travel term
 ## deliberately over-covers by `scroll_scale x view_size`: the span is computed
 ## once at build time, and a later window resize grows the screen without
-## rebuilding the stars.
+## rebuilding the stars. That margin absorbs a widening to
+## `view_size / (1 - scroll_scale)` -- about 1355px from the 1152px base for a
+## 0.15 layer. Past that a starless strip appears at the far sector edge.
+## Android locks landscape so it cannot arise there; on desktop the trade is
+## deliberate, because rebuilding on `size_changed` would re-scatter the whole
+## sky mid-drag.
+##
+## The band is anchored at `bounds.position`, which is the true anchor only
+## because every sector starts at the origin: `SectorDefinition.get_bounds()`
+## returns `Rect2(Vector2.ZERO, world_size)`, and `Sector.get_bounds()` falls
+## back to a viewport rect that is also at the origin. A layer's reachable band
+## really begins at `scroll_scale x bounds.position`, so an offset sector would
+## need that term here -- and would also break the "every star is inside the
+## sector" invariant the shipped-game test asserts, since a slower layer's band
+## starts *before* an offset sector does. Both would have to be settled
+## together; neither is reachable today.
 static func parallax_span(bounds: Rect2, scroll_scale: Vector2, view_size: Vector2) -> Rect2:
 	var span := (bounds.size * scroll_scale + view_size).min(bounds.size)
 	return Rect2(bounds.position, span)

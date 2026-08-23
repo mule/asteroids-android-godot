@@ -337,10 +337,7 @@ func _apply_sector_bounds_to_entity(entity: Node) -> void:
 
 func _build_star_layers() -> void:
 	var bounds := sector.get_bounds()
-	var sector_seed := random_seed
-
-	if sector.definition != null and "sector_seed" in sector.definition:
-		sector_seed = sector.definition.sector_seed
+	var sector_seed := sector.get_seed(random_seed)
 
 	_build_star_layer(stars_far, bounds, sector_seed)
 	_build_star_layer(stars_mid, bounds, sector_seed)

@@ -30,6 +30,22 @@ func get_center() -> Vector2:
 	return get_bounds().get_center()
 
 
+## The sector's layout seed. Callers pass what they would have used had this
+## sector carried no definition, because the caller -- not the sector -- owns
+## that default: `game.gd` seeds its asteroid spawns from its own exported
+## `random_seed`, and the star layers must land on the same sky as those
+## asteroids whether or not a definition is present.
+##
+## Here rather than read off `sector.definition` at the call site so that the
+## "ask the Sector, not the resource behind it" rule this node exists to
+## enforce holds for the seed as it already does for bounds and margin.
+func get_seed(fallback: int) -> int:
+	if definition != null and "sector_seed" in definition:
+		return definition.sector_seed
+
+	return fallback
+
+
 func get_boundary_margin() -> float:
 	if definition != null and "boundary_margin" in definition:
 		return definition.boundary_margin

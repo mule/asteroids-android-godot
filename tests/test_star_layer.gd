@@ -165,6 +165,16 @@ func _boot_game() -> Node:
 	await process_frame
 
 	var game := (load(GAME_SCENE) as PackedScene).instantiate()
+	# Before add_child, so _ready() sees it: with auto_start the sector fills
+	# with drifting asteroids, and one clipping the parked ship runs
+	# _begin_respawn -> _respawn_player -> follow_camera.set_target(ship).
+	# FollowCamera._physics_process would then overwrite every position
+	# _look_at sets, and because star density is even the sweep would still
+	# report a healthy count -- from whatever single spot the camera had been
+	# dragged back to. The test would pass while no longer sweeping anything.
+	# The layers are built in _ready() either way, so nothing here needs a
+	# running game.
+	game.auto_start = false
 	root.add_child(game)
 	await process_frame
 	await physics_frame
@@ -239,6 +249,16 @@ func _test_the_shipped_game_never_shows_an_empty_sky(failures: Array[String]) ->
 		var y := sector_bounds.position.y
 		while y <= sector_bounds.end.y:
 			await _look_at(camera, Vector2(x, y))
+			# A camera that has picked a target again is no longer being swept:
+			# FollowCamera._physics_process drives global_position from the
+			# target, so every later _look_at would be undone and this loop
+			# would sample one spot 88 times and still report a healthy count.
+			# Fail loudly rather than quietly stop covering the sector.
+			if camera.target != null:
+				failures.append("Shipped game: the sweep camera was re-targeted; it is no longer sweeping")
+				game.queue_free()
+				await process_frame
+				return
 			var visible := 0
 			for layer in layers:
 				visible += _stars_on_screen(layer, view)
