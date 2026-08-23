@@ -4,7 +4,11 @@ extends Node2D
 class_name Sector
 
 
+const ASTEROID_FIELD_SCENE := preload("res://scenes/world/AsteroidField.tscn")
+
 @export var definition: Resource
+
+var _fields: Array[Node2D] = []
 
 
 func get_bounds() -> Rect2:
@@ -75,3 +79,74 @@ func get_random_position(rng: RandomNumberGenerator, inset: float = 0.0) -> Vect
 		rng.randf_range(bounds.position.x + limit.x, bounds.end.x - limit.x),
 		rng.randf_range(bounds.position.y + limit.y, bounds.end.y - limit.y)
 	)
+
+
+func place_content(rng: RandomNumberGenerator) -> void:
+	_clear_fields()
+
+	if definition == null:
+		return
+
+	var field_count: int = definition.asteroid_field_count if "asteroid_field_count" in definition else 0
+	var radius_min: float = definition.asteroid_field_radius_min if "asteroid_field_radius_min" in definition else 320.0
+	var radius_max: float = definition.asteroid_field_radius_max if "asteroid_field_radius_max" in definition else radius_min
+	var budget: int = definition.asteroid_field_budget if "asteroid_field_budget" in definition else 4
+	var min_separation: float = definition.min_landmark_separation if "min_landmark_separation" in definition else 0.0
+
+	if radius_max < radius_min:
+		var swap := radius_min
+		radius_min = radius_max
+		radius_max = swap
+
+	for index in field_count:
+		var field := ASTEROID_FIELD_SCENE.instantiate() as Node2D
+		field.field_name = StringName("asteroid_field_%02d" % (index + 1))
+		field.field_radius = rng.randf_range(radius_min, radius_max)
+		field.asteroid_budget = budget
+		field.position = find_free_position(rng, field.field_radius, min_separation)
+		add_child(field)
+		_fields.append(field)
+
+
+func get_fields() -> Array[Node2D]:
+	var fields: Array[Node2D] = []
+	for field in _fields:
+		if is_instance_valid(field) and not field.is_queued_for_deletion():
+			fields.append(field)
+	return fields
+
+
+func find_free_position(rng: RandomNumberGenerator, radius: float, min_separation: float) -> Vector2:
+	var best_position := Vector2.ZERO
+	var best_distance := -INF
+
+	for attempt in 32:
+		var candidate := get_random_position(rng, radius)
+		var nearest_distance := _get_nearest_field_distance(candidate)
+
+		if nearest_distance >= min_separation:
+			return candidate
+
+		if nearest_distance > best_distance:
+			best_distance = nearest_distance
+			best_position = candidate
+
+	return best_position
+
+
+func _get_nearest_field_distance(candidate: Vector2) -> float:
+	if _fields.is_empty():
+		return INF
+
+	var nearest_distance := INF
+	for field in get_fields():
+		nearest_distance = minf(nearest_distance, candidate.distance_to(field.global_position))
+
+	return nearest_distance
+
+
+func _clear_fields() -> void:
+	for field in _fields:
+		if is_instance_valid(field):
+			field.queue_free()
+	_fields.clear()
