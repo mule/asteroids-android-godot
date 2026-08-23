@@ -39,6 +39,7 @@ var score: int = 0
 var wave: int = 0
 var play_active: bool = false
 var paused: bool = false
+var invulnerability_token: int = 0
 
 
 func _ready() -> void:
@@ -124,6 +125,16 @@ func _on_player_ship_area_entered(area: Area2D) -> void:
 	if not play_active or paused or not area.is_in_group("asteroids"):
 		return
 
+	# Asked of the ship's own flag, not its `monitoring` state: set_invulnerable
+	# can only switch overlap detection off deferred, so every asteroid that
+	# began overlapping during this same physics step still reports in after
+	# the window opened. Without this check the window does not cover the frame
+	# that opened it, and a ship flying into a cluster is charged one full hit
+	# per asteroid at once -- the chaining damage_invulnerability_seconds
+	# exists to prevent. This is what the deleted `respawning` flag used to do.
+	if player_ship.is_invulnerable():
+		return
+
 	feedback.spawn_player_hit(player_ship.global_position)
 	# The hull is the authority on whether the run continues: apply_damage
 	# emits `destroyed` once at zero, and _end_game is connected to it.
@@ -203,11 +214,16 @@ func _spawn_player() -> void:
 	feedback.spawn_respawn_ring(player_ship.global_position)
 
 
+## Each window carries a token so a timer left running by an abandoned run --
+## restart the game mid-window and the old timeout still arrives -- cannot cut
+## the current window short.
 func _begin_damage_invulnerability() -> void:
+	invulnerability_token += 1
+	var token := invulnerability_token
 	player_ship.set_invulnerable(true)
 	await get_tree().create_timer(damage_invulnerability_seconds).timeout
 
-	if play_active:
+	if play_active and token == invulnerability_token:
 		player_ship.set_invulnerable(false)
 
 

@@ -37,6 +37,7 @@ func _init() -> void:
 	await _test_repair_and_refuel_clamp_at_their_maxima(failures)
 	await _test_the_game_runs_on_hull_instead_of_lives(failures)
 	await _test_the_run_ends_when_the_hull_is_gone(failures)
+	await _test_one_frame_of_asteroids_costs_one_hit(failures)
 	await _test_the_hud_shows_hull_fuel_credits_and_reserve(failures)
 
 	for failure in failures:
@@ -274,16 +275,36 @@ func _test_repair_and_refuel_clamp_at_their_maxima(failures: Array[String]) -> v
 	await process_frame
 
 
+## True when `name` appears as a whole word in `source` outside its comments.
+func _find_identifier(source: String, name: String) -> bool:
+	var code_lines := PackedStringArray()
+	for line in source.split("\n"):
+		var comment := line.find("#")
+		code_lines.append(line if comment < 0 else line.substr(0, comment))
+
+	var identifier := RegEx.new()
+	identifier.compile("\\b%s\\b" % name)
+	return identifier.search("\n".join(code_lines)) != null
+
+
 func _test_the_game_runs_on_hull_instead_of_lives(failures: Array[String]) -> void:
+	# Comments are stripped and the match is word-bounded before this looks for
+	# the identifier. game.gd is heavily annotated by repo convention, and a
+	# plain substring search over the raw text would fail CI on any future
+	# prose that happens to contain the letters -- "delivers", "the authority
+	# lives here" -- with a message claiming the lives model is back.
 	var source := FileAccess.get_file_as_string("res://scripts/game.gd")
 	if source.is_empty():
 		failures.append("Lives: could not read scripts/game.gd")
-	elif source.contains("lives"):
-		failures.append("Lives: scripts/game.gd still mentions lives")
+	elif _find_identifier(source, "lives"):
+		failures.append("Lives: scripts/game.gd still declares or reads a lives identifier")
 
 	var game := (load(GAME_SCENE) as PackedScene).instantiate()
-	root.add_child(game)
+	# Before add_child: _ready() runs inside add_child, so setting it after
+	# has already let a whole throwaway game start and fill the sector with
+	# drifting asteroids -- the same ordering test_star_layer.gd documents.
 	game.auto_start = false
+	root.add_child(game)
 	await physics_frame
 	game._start_new_game()
 	await physics_frame
@@ -311,8 +332,8 @@ func _test_the_game_runs_on_hull_instead_of_lives(failures: Array[String]) -> vo
 
 func _test_the_run_ends_when_the_hull_is_gone(failures: Array[String]) -> void:
 	var game := (load(GAME_SCENE) as PackedScene).instantiate()
+	game.auto_start = false  # Before add_child -- see the note above.
 	root.add_child(game)
-	game.auto_start = false
 	await physics_frame
 	game._start_new_game()
 	await physics_frame
@@ -328,10 +349,45 @@ func _test_the_run_ends_when_the_hull_is_gone(failures: Array[String]) -> void:
 	await physics_frame
 
 
+## The post-damage window has to cover the frame it was opened on. Godot can
+## only clear an Area2D's `monitoring` deferred, so every asteroid that began
+## overlapping during the same physics step still reports in afterwards; a ship
+## flying into a cluster must not be charged one full hit per asteroid.
+func _test_one_frame_of_asteroids_costs_one_hit(failures: Array[String]) -> void:
+	var game := (load(GAME_SCENE) as PackedScene).instantiate()
+	game.auto_start = false  # Before add_child -- see the note above.
+	root.add_child(game)
+	await physics_frame
+	game._start_new_game()
+	await physics_frame
+
+	var systems: Node = game.ship_systems
+	game.player_ship.set_invulnerable(false)
+	await physics_frame
+
+	var starting_hull: float = systems.hull
+	for _index in 3:
+		game._spawn_asteroid(0, game.player_ship.global_position, Vector2.ZERO)
+
+	for _step in 5:
+		await physics_frame
+
+	var lost: float = starting_hull - systems.hull
+	if not is_equal_approx(lost, game.asteroid_collision_damage):
+		failures.append(
+			"Damage chaining: three asteroids in one frame cost %f hull, one hit is %f"
+			% [lost, game.asteroid_collision_damage]
+		)
+
+	root.remove_child(game)
+	game.free()
+	await physics_frame
+
+
 func _test_the_hud_shows_hull_fuel_credits_and_reserve(failures: Array[String]) -> void:
 	var game := (load(GAME_SCENE) as PackedScene).instantiate()
+	game.auto_start = false  # Before add_child -- see the note above.
 	root.add_child(game)
-	game.auto_start = false
 	await physics_frame
 	game._start_new_game()
 	await physics_frame

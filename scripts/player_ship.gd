@@ -203,6 +203,14 @@ func set_invulnerable(value: bool) -> void:
 	modulate = Color(1.0, 1.0, 1.0, 0.45) if value else Color.WHITE
 
 
+## Read this rather than the deferred `monitoring` flag. `set_invulnerable`
+## can only turn overlap detection off at the end of the frame, so every
+## `area_entered` already queued for the current physics step still arrives
+## after the ship became invulnerable; this answers truthfully in that gap.
+func is_invulnerable() -> bool:
+	return invulnerable
+
+
 func set_shader_lighting_enabled(value: bool) -> void:
 	shader_lighting_enabled = value
 	MATERIAL_RUNTIME.set_lighting_enabled(ship_material, value)
