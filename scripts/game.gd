@@ -25,8 +25,8 @@ const ASTEROID_SMALL := 2
 @onready var player_ship: Area2D = $Entities/PlayerShip
 @onready var sector: Sector = $Sector
 @onready var follow_camera: Camera2D = $FollowCamera
-@onready var stars_far: Node2D = $StarsFar/Layer
-@onready var stars_mid: Node2D = $StarsMid/Layer
+@onready var stars_far: StarLayer = $StarsFar/Layer
+@onready var stars_mid: StarLayer = $StarsMid/Layer
 @onready var player_input: Node = $PlayerInput
 @onready var feedback: Node = $Feedback
 @onready var hud: CanvasLayer = $Hud
@@ -342,8 +342,19 @@ func _build_star_layers() -> void:
 	if sector.definition != null and "sector_seed" in sector.definition:
 		sector_seed = sector.definition.sector_seed
 
-	stars_far.build_stars(bounds, sector_seed + stars_far.layer_seed)
-	stars_mid.build_stars(bounds, sector_seed + stars_mid.layer_seed)
+	_build_star_layer(stars_far, bounds, sector_seed)
+	_build_star_layer(stars_mid, bounds, sector_seed)
+
+
+## Each layer is scattered over the band its own scroll_scale can bring on
+## screen rather than over the whole sector -- see StarLayer.parallax_span().
+## The sector still decides how big the world is; the viewport is asked only
+## how big the screen is, which is the same split Sector.get_bounds() uses.
+func _build_star_layer(layer: StarLayer, bounds: Rect2, sector_seed: int) -> void:
+	var parallax := layer.get_parent() as Parallax2D
+	var scroll_scale := Vector2.ONE if parallax == null else parallax.scroll_scale
+	var span := StarLayer.parallax_span(bounds, scroll_scale, get_viewport_rect().size)
+	layer.build_stars(span, sector_seed + layer.layer_seed)
 
 
 func _on_hud_touch_action_changed(action: StringName, pressed: bool) -> void:
