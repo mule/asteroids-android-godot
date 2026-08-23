@@ -14,6 +14,7 @@ func _init() -> void:
 	_test_reflect_only_when_moving_outward(failures)
 	_test_edge_pressure_ramps_inward(failures)
 	await _test_sector_is_never_smaller_than_the_viewport(failures)
+	await _test_sector_reports_its_seed_and_falls_back_to_the_caller(failures)
 	await _test_entities_track_a_viewport_resize(failures)
 	await _test_camera_limits_track_a_viewport_resize(failures)
 
@@ -118,6 +119,36 @@ func _test_sector_is_never_smaller_than_the_viewport(failures: Array[String]) ->
 
 	if not bounds.encloses(SECTOR_DEFINITION.get_bounds()):
 		failures.append("Sector: bounds %s must cover the sector definition" % bounds)
+
+	sector.queue_free()
+	await process_frame
+
+
+## game.gd builds the star layers from this seed, so a sector that stopped
+## reporting its definition's seed would silently reseed the sky off game.gd's
+## own default and the layout would no longer be reproducible from the sector.
+func _test_sector_reports_its_seed_and_falls_back_to_the_caller(failures: Array[String]) -> void:
+	var sector := Sector.new()
+	if sector == null:
+		failures.append("Sector: could not instantiate scripts/world/sector.gd")
+		return
+
+	root.add_child(sector)
+	await process_frame
+
+	# No definition: the caller's own seed is all there is to go on.
+	if sector.get_seed(4242) != 4242:
+		failures.append(
+			"Sector: a definition-less sector must return the fallback seed, got %d"
+			% sector.get_seed(4242)
+		)
+
+	sector.definition = SECTOR_DEFINITION
+	if sector.get_seed(4242) != SECTOR_DEFINITION.sector_seed:
+		failures.append(
+			"Sector: the definition's seed %d must win over the fallback, got %d"
+			% [SECTOR_DEFINITION.sector_seed, sector.get_seed(4242)]
+		)
 
 	sector.queue_free()
 	await process_frame
