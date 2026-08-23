@@ -7,10 +7,12 @@
 # Antigravity's model is declared here but configured on its own side; Orca
 # cannot pin it per launch.
 #
-# Every `agent` below must be an agent CONFIGURED IN ORCA, not merely a binary
-# on PATH. `worker-start --agent <id>` validates against Orca's configured
-# agents and rejects anything else with `agent_unconfigured`, which costs a
-# claim every scheduled run. tests/pool/test_roster.sh enforces this.
+# Every `agent` below must be one `orca agent hooks status` reports as
+# `installed`, not merely a binary on PATH. `worker-start --agent <id>`
+# rejects anything else with `agent_unconfigured`, which costs a claim every
+# scheduled run. That command also lists ids Orca merely KNOWS -- cursor,
+# gemini, amp and others are `not_installed` -- so "Orca has heard of it" is
+# not the bar. tests/pool/test_roster.sh enforces this for every row.
 #
 # Tier 1 takes the mechanical, well-specified issues. Tier 2 takes the ones
 # whose difficulty is algorithmic rather than large: AI steering, simulation

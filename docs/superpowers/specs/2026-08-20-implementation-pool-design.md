@@ -129,10 +129,11 @@ on antigravity's own side, not enforced by Orca. The roster row documents
 intent; it does not guarantee it.
 
 That list is about pinning a *model*, and is not the list of agents the roster
-may name. `worker-start --agent` validates against the agents **configured in
-Orca** — one hook apiece under `~/.orca/agent-hooks/` — and rejects anything
-else with `agent_unconfigured`. An agent that is merely a binary on PATH does
-not qualify. A row naming one costs a claim on every scheduled run: the
+may name. `worker-start --agent` accepts only agents Orca has **installed**,
+and rejects anything else with `agent_unconfigured`. The authority is `orca
+agent hooks status`, which enumerates every agent id Orca knows and marks each
+`installed` or `not_installed` — being *known* is not enough, and being a
+binary on PATH counts for nothing. A row naming one costs a claim on every scheduled run: the
 coordinator locks the issue, the launch fails, and the issue comes back
 untouched — and because `MAX_PARALLEL` counts rows, the same row inflates the
 fleet budget past what can actually start. `tests/pool/test_roster.sh` enforces

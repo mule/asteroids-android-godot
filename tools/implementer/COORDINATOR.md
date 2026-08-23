@@ -238,12 +238,19 @@ exits 1 and its JSON names the failed stage and any residual resources. A held
 lock with no live worker stalls the pool silently for a full 90 minutes. Do
 this release before moving to the next issue, not at the end of the run.
 
-If `worker-start` fails because the roster's `agent` id is not an installed
-Orca agent (Orca's known ids are the TUI agents installed on this host, e.g.
-`claude`, `codex`), do **not** retry the remaining issues with that same agent
-id — release each remaining claim you have taken, stop dispatching, and report
-the exact error. Otherwise you burn the whole budget on the same failure every
-hour.
+If `worker-start` fails with `agent_unconfigured`, do **not** retry the
+remaining issues with that same agent id — release each remaining claim you
+have taken, stop dispatching, and report the exact error. Otherwise you burn
+the whole budget on the same failure every hour.
+
+Report the id it rejected alongside `orca agent hooks status`, which is the
+only authoritative answer to "can Orca launch this?". It lists every agent id
+Orca knows and marks each `installed` or `not_installed`; only `installed`
+ones can be launched. Do not diagnose this from PATH: `opencode` is on PATH
+here and is not a known id at all, while `cursor` is a known id that is
+`not_installed`. Both fail the same way, and both look launchable if you check
+the wrong thing. `tests/pool/test_roster.sh` pins the roster to that command's
+`installed` set.
 
 Record the returned `dispatch_id`.
 
