@@ -369,6 +369,44 @@ Report, in plain text:
 
 ---
 
+## Step 10 — Reap this automation's spent worktrees
+
+Every scheduled run creates its own coordinator worktree, and nothing reclaims
+it. Left alone they accumulate at one per tick: on 2026-08-23 this repo reached
+69 worktrees, 24 of them spent coordinator checkouts pinned at commits days old.
+
+You cannot clean up after yourself — you are running inside your own worktree.
+So each run reaps its **predecessors** instead, and a later run reaps you.
+
+```bash
+orca automations runs --id 87dab7d4-9953-46aa-bf26-fac71386aec9 --json
+```
+
+For each run in that list:
+
+- **Skip it if `status` is `dispatched`** — that run is still working, and
+  removing its worktree would destroy live work. Only finished runs
+  (`completed`, `failed`, `skipped_precheck`) may be reaped.
+- **Skip it if its `workspaceId` path is your own working directory.** That is
+  you. Removing it would kill this run mid-report.
+- Otherwise remove it:
+
+```bash
+orca worktree rm --worktree "id:<workspaceId>" --json
+```
+
+`workspaceId` is already in the exact `id:<repo-id>::<path>` form the selector
+wants — pass it through unchanged, do not rebuild it. This removes the worktree
+**and** its terminal, including a terminal sitting idle at a prompt after its
+agent finished. No `--force` is needed, and it was verified against a finished
+run whose terminal was still alive.
+
+Report how many you reaped. If a removal fails, say so and continue — a
+worktree that will not go is a note for a human, not a reason to stop.
+
+If the automation id above is wrong (the automation was recreated), find it with
+`orca automations list` by name and say in your report that the id has drifted.
+
 ## Rules — absolute
 
 - The lock grants implementation rights. **No lock, no work.** Never act on an
