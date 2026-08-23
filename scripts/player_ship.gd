@@ -21,6 +21,7 @@ signal boundary_warning_changed(active: bool)
 @onready var ship_shape: Polygon2D = $ShipShape
 @onready var thrust_flame: Polygon2D = $ThrustFlame
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
+@onready var ship_systems: ShipSystems = $ShipSystems
 @onready var input_source: Node = get_node_or_null(input_source_path)
 
 var velocity: Vector2 = Vector2.ZERO
@@ -71,9 +72,22 @@ func _apply_thrust_input(delta: float) -> void:
 	var is_thrusting := _is_thrust_pressed()
 	thrust_flame.visible = is_thrusting
 
-	if is_thrusting:
-		velocity += Vector2.UP.rotated(rotation) * acceleration * delta
-		velocity = velocity.limit_length(max_speed)
+	if not is_thrusting:
+		return
+
+	# Read the factor before burning, so the frame that empties the tank is
+	# still a full-power frame; reserve thrust starts on the next one.
+	var factor := _get_thrust_factor()
+	ship_systems.consume_fuel(delta)
+	velocity += Vector2.UP.rotated(rotation) * acceleration * factor * delta
+	velocity = velocity.limit_length(max_speed)
+
+
+## Fuel gates thrust but never removes it -- see ShipSystems.reserve_thrust_factor.
+## The sector boundary push in _contain_in_sector is deliberately not gated: it
+## is a world force, and a dry ship pinned on the wall still has to be let go.
+func _get_thrust_factor() -> float:
+	return ship_systems.get_thrust_factor()
 
 
 func _apply_shoot_input() -> void:

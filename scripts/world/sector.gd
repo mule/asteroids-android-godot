@@ -46,6 +46,16 @@ func get_seed(fallback: int) -> int:
 	return fallback
 
 
+## The sector's display name, asked of the Sector rather than read off
+## `sector.definition` at the call site, for the same reason as get_seed():
+## this node is the one authority on what the active sector is.
+func get_sector_name(fallback: String) -> String:
+	if definition != null and "sector_name" in definition:
+		return String(definition.sector_name)
+
+	return fallback
+
+
 func get_boundary_margin() -> float:
 	if definition != null and "boundary_margin" in definition:
 		return definition.boundary_margin

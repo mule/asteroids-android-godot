@@ -263,7 +263,9 @@ func _test_player_ship_collides_with_asteroid(failures: Array[String]) -> void:
 	game._start_new_game()
 	await physics_frame
 
-	var initial_lives: int = game.lives
+	# Lives are gone: the hull is what a collision costs now (#53).
+	var systems: Node = game.ship_systems
+	var initial_hull: float = systems.hull
 	var player: Area2D = game.player_ship
 	player.set_invulnerable(false)
 
@@ -272,8 +274,8 @@ func _test_player_ship_collides_with_asteroid(failures: Array[String]) -> void:
 	for _step in 5:
 		await physics_frame
 
-	if game.lives >= initial_lives:
-		failures.append("Ship collision: player did not lose a life on asteroid collision")
+	if systems.hull >= initial_hull:
+		failures.append("Ship collision: player hull was not damaged by an asteroid collision")
 
 	root.remove_child(game)
 	game.free()

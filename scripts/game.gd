@@ -8,13 +8,15 @@ const ASTEROID_SMALL := 2
 @export var asteroid_scene: PackedScene
 @export var bullet_scene: PackedScene
 @export var starting_score: int = 0
-@export var starting_lives: int = 3
 @export var starting_wave: int = 1
 @export var initial_asteroid_count: int = 4
 @export var spawn_safe_radius: float = 180.0
 @export var split_child_count: int = 2
-@export var respawn_delay_seconds: float = 1.2
-@export var respawn_invulnerability_seconds: float = 2.0
+@export var asteroid_collision_damage: float = 25.0
+## Brief post-damage immunity. Inherited from the deleted respawn cycle so a
+## single collision cannot chain into instant destruction: an asteroid resting
+## on the ship would otherwise land a hit every physics frame.
+@export var damage_invulnerability_seconds: float = 2.0
 @export var random_seed: int = 1729
 @export var world_light_direction: Vector2 = Vector2(-0.55, -0.83)
 @export var shader_lighting_enabled: bool = true
@@ -23,6 +25,7 @@ const ASTEROID_SMALL := 2
 
 @onready var entities: Node2D = $Entities
 @onready var player_ship: Area2D = $Entities/PlayerShip
+@onready var ship_systems: ShipSystems = $Entities/PlayerShip/ShipSystems
 @onready var sector: Sector = $Sector
 @onready var follow_camera: Camera2D = $FollowCamera
 @onready var stars_far: StarLayer = $StarsFar/Layer
@@ -33,11 +36,9 @@ const ASTEROID_SMALL := 2
 
 var random := RandomNumberGenerator.new()
 var score: int = 0
-var lives: int = 0
 var wave: int = 0
 var play_active: bool = false
 var paused: bool = false
-var respawning: bool = false
 
 
 func _ready() -> void:
@@ -46,6 +47,11 @@ func _ready() -> void:
 	player_ship.shoot_requested.connect(_on_player_ship_shoot_requested)
 	player_ship.area_entered.connect(_on_player_ship_area_entered)
 	player_ship.boundary_warning_changed.connect(hud.set_boundary_warning)
+	ship_systems.hull_changed.connect(hud.set_hull)
+	ship_systems.fuel_changed.connect(hud.set_fuel)
+	ship_systems.credits_changed.connect(hud.set_credits)
+	ship_systems.reserve_thrust_changed.connect(hud.set_reserve_thrust)
+	ship_systems.destroyed.connect(_end_game)
 	hud.pause_requested.connect(_pause_game)
 	hud.resume_requested.connect(_resume_game)
 	hud.restart_requested.connect(_start_new_game)
@@ -81,16 +87,15 @@ func _start_new_game() -> void:
 	_clear_dynamic_entities()
 	feedback.clear_effects()
 	score = starting_score
-	lives = starting_lives
 	wave = starting_wave
 	play_active = true
 	paused = false
-	respawning = false
 	get_tree().paused = false
+	ship_systems.reset_systems()
 	hud.hide_status()
 	hud.set_pause_available(true)
 	_update_hud()
-	_respawn_player(false)
+	_spawn_player()
 	_spawn_wave()
 	feedback.spawn_wave_flash()
 
@@ -100,7 +105,7 @@ func _on_player_ship_shoot_requested(
 	direction: Vector2,
 	inherited_velocity: Vector2
 ) -> void:
-	if not play_active or paused or respawning:
+	if not play_active or paused:
 		return
 
 	var bullet := bullet_scene.instantiate()
@@ -116,19 +121,18 @@ func _on_player_ship_shoot_requested(
 
 
 func _on_player_ship_area_entered(area: Area2D) -> void:
-	if not play_active or paused or respawning or not area.is_in_group("asteroids"):
+	if not play_active or paused or not area.is_in_group("asteroids"):
 		return
 
-	lives = max(0, lives - 1)
 	feedback.spawn_player_hit(player_ship.global_position)
-	_update_hud()
-	_clear_bullets()
+	# The hull is the authority on whether the run continues: apply_damage
+	# emits `destroyed` once at zero, and _end_game is connected to it.
+	ship_systems.apply_damage(asteroid_collision_damage)
 
-	if lives <= 0:
-		_end_game()
+	if ship_systems.is_destroyed():
 		return
 
-	_begin_respawn()
+	_begin_damage_invulnerability()
 
 
 func _spawn_wave() -> void:
@@ -169,6 +173,7 @@ func _on_asteroid_destroyed(
 		return
 
 	score += _get_score_value(size_tier)
+	ship_systems.add_credits(_get_credit_value(size_tier))
 	feedback.spawn_asteroid_burst(hit_position, size_tier)
 	_update_hud()
 
@@ -188,34 +193,21 @@ func _spawn_split_asteroids(size_tier: int, hit_position: Vector2, incoming_velo
 		_spawn_asteroid(size_tier, hit_position, velocity)
 
 
-func _begin_respawn() -> void:
-	respawning = true
-	player_ship.set_controls_enabled(false)
-	player_ship.set_invulnerable(true)
-	await get_tree().create_timer(respawn_delay_seconds).timeout
-
-	if not play_active:
-		return
-
-	_respawn_player(true)
-
-
-func _respawn_player(use_invulnerability_timer: bool) -> void:
+## The ship is placed once per run. There is no respawn: damage accumulates on
+## the hull and the run ends when it is gone.
+func _spawn_player() -> void:
 	player_ship.reset_for_respawn(sector.get_center())
 	player_ship.set_controls_enabled(true)
-	player_ship.set_invulnerable(use_invulnerability_timer)
+	player_ship.set_invulnerable(false)
 	follow_camera.set_target(player_ship)
 	feedback.spawn_respawn_ring(player_ship.global_position)
-	respawning = false
-
-	if use_invulnerability_timer:
-		_end_invulnerability_after_delay()
 
 
-func _end_invulnerability_after_delay() -> void:
-	await get_tree().create_timer(respawn_invulnerability_seconds).timeout
+func _begin_damage_invulnerability() -> void:
+	player_ship.set_invulnerable(true)
+	await get_tree().create_timer(damage_invulnerability_seconds).timeout
 
-	if play_active and not respawning:
+	if play_active:
 		player_ship.set_invulnerable(false)
 
 
@@ -223,7 +215,6 @@ func _end_game() -> void:
 	get_tree().paused = false
 	play_active = false
 	paused = false
-	respawning = false
 	player_ship.set_controls_enabled(false)
 	player_ship.set_invulnerable(true)
 	hud.show_game_over(score, wave)
@@ -263,8 +254,8 @@ func _get_active_asteroid_count() -> int:
 
 func _update_hud() -> void:
 	hud.set_score(score)
-	hud.set_lives(lives)
 	hud.set_wave(wave)
+	hud.set_sector(sector.get_sector_name("unknown"), sector.get_seed(random_seed))
 
 
 func _pause_game() -> void:
@@ -466,3 +457,15 @@ func _get_score_value(size_tier: int) -> int:
 			return 50
 		_:
 			return 100
+
+
+## Credits are the spendable currency #54 charges for repair and refuel, so
+## they are deliberately a much smaller number than the raw arcade score.
+func _get_credit_value(size_tier: int) -> int:
+	match size_tier:
+		ASTEROID_LARGE:
+			return 4
+		ASTEROID_MEDIUM:
+			return 7
+		_:
+			return 12
