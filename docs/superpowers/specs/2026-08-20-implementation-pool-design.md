@@ -105,6 +105,7 @@ once.
 # role       agent        model      effort  tier
 implement    antigravity  3.7-flash  -       1
 implement    claude       opus       high    2
+implement    codex        gpt-5.5    high    2
 review       claude       opus       max     3
 ```
 
@@ -127,13 +128,25 @@ only. Antigravity's model is therefore *declared* in the roster and configured
 on antigravity's own side, not enforced by Orca. The roster row documents
 intent; it does not guarantee it.
 
+That list is about pinning a *model*, and is not the list of agents the roster
+may name. `worker-start --agent` accepts only agents Orca has **installed**,
+and rejects anything else with `agent_unconfigured`. The authority is `orca
+agent hooks status`, which enumerates every agent id Orca knows and marks each
+`installed` or `not_installed` — being *known* is not enough, and being a
+binary on PATH counts for nothing. A row naming one costs a claim on every scheduled run: the
+coordinator locks the issue, the launch fails, and the issue comes back
+untouched — and because `MAX_PARALLEL` counts rows, the same row inflates the
+fleet budget past what can actually start. `tests/pool/test_roster.sh` enforces
+this, so the roster grows only after the hook does.
+
 ### Concurrency
 
-`MAX_PARALLEL` is the number of `implement` rows in the roster — 2 today, 4
-once opencode and codex land. A coordinator claims at most
-`MAX_PARALLEL - len(held(implementer-locks))` issues. The subtraction matters: the lock prevents two agents taking the same
-*issue*, not a second scheduled run doubling the *fleet* while the first is
-still working.
+`MAX_PARALLEL` is the number of `implement` rows in the roster — 3 today
+(antigravity, claude, codex), and it grows only when a fourth agent is
+configured in Orca, not when a fourth is merely installed. A coordinator
+claims at most `MAX_PARALLEL - len(held(implementer-locks))` issues. The
+subtraction matters: the lock prevents two agents taking the same *issue*, not
+a second scheduled run doubling the *fleet* while the first is still working.
 
 ### Cadence
 
