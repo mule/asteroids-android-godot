@@ -21,14 +21,22 @@ check "comments are ignored" "" "$($R implementers | grep '^#' || true)"
 # whatever binary happens to be on PATH, and rejects an unknown id with
 # `agent_unconfigured`. A roster row naming an unconfigured agent burns a claim
 # every scheduled run: the coordinator locks the issue, worker-start fails, and
-# the issue is handed back untouched. Keep this list in step with the agents
-# configured in Orca (see ~/.orca/agent-hooks/).
-LAUNCHABLE=" antigravity claude codex cursor "
+# the issue is handed back untouched.
+#
+# This list is the set of agents CONFIGURED IN ORCA -- one `<id>-hook.sh` per
+# entry under ~/.orca/agent-hooks/. It is deliberately NOT the list in Orca's
+# `worker-start` note that "--model supports Claude, Codex, and Cursor": that
+# one says which providers accept a pinned model id, which is a different axis
+# entirely. Widening this list to match it would readmit exactly the bug this
+# check exists to catch -- a plausible-looking row that dies at launch. Add an
+# entry here only once the matching hook exists.
+LAUNCHABLE=" antigravity claude codex "
 for a in $($R implementers | cut -f1); do
   case "$LAUNCHABLE" in
-    *" $a "*) check "implementer '$a' is a launchable Orca agent" "$a" "$a" ;;
-    *) check "implementer '$a' is a launchable Orca agent" "<one of:$LAUNCHABLE>" "$a" ;;
+    *" $a "*) got="$a" ;;
+    *)        got="$a (no hook in ~/.orca/agent-hooks/)" ;;
   esac
+  check "implementer '$a' is an agent Orca can launch" "$a" "$got"
 done
 
 [ "$fails" -eq 0 ] || exit 1
