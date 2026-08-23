@@ -27,9 +27,16 @@ Use the existing polygon scenes as the first scale reference:
 - Planet: roughly 900 pixels across.
 - Space station: roughly 320 pixels across, with docking approach geometry
   readable from the silhouette.
-- Interceptor ship: roughly 30 pixels wide and 60 pixels tall.
-- Gunship: roughly 70 pixels wide and 110 pixels tall.
-- Freighter: roughly 120 pixels wide and 190 pixels tall.
+- Interceptor ship: roughly 30 pixels wide and 60 pixels tall, 78 including
+  thrust.
+- Gunship: roughly 70 pixels wide and 110 pixels tall, 135 including thrust.
+- Freighter: roughly 120 pixels wide and 190 pixels tall, 219 including thrust.
+
+Ship heights are quoted hull-first, then with the thrust flame, because the two
+differ enough to mislead: the player ship's 78 is a with-thrust figure over a
+36x50 hull, and the interceptor's hull-only 60 is also 78 once thrust is
+included. Validator limits in `tools/asset_pipeline/validate_assets.py` bound
+the hull polygon only, so compare hull figures when reading them.
 
 At normal gameplay zoom, a player should recognize the ship nose, asteroid
 outline, and bullet direction without pausing. At enlarged gallery scale, the
