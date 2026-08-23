@@ -94,6 +94,13 @@ texture dimensions, alpha policy, file-size limits, audio format, sample rate,
 channel count, duration, peak level, loop policy, prompt/provenance, and manual
 cleanup notes.
 
+Celestial and station vector outputs are generated alongside ships, asteroids,
+and bullets. Approved celestial source specifications build to
+`assets/generated/celestial/`, while approved station specifications build to
+`assets/generated/stations/`. Gameplay integration for these categories belongs
+to the consuming feature issues; this pipeline only produces reviewed resources
+and gallery visibility.
+
 ## Asset IDs and file names
 
 Use lowercase snake case for every asset ID and file stem:
@@ -101,6 +108,8 @@ Use lowercase snake case for every asset ID and file stem:
 - Ship family: `ship_interceptor_01`, `ship_scout_01`
 - Asteroid family: `asteroid_rocky_01`, `asteroid_ice_01`
 - Bullet family: `bullet_plasma_01`, `bullet_tracer_01`
+- Celestial family: `celestial_planet_01`, `celestial_moon_01`
+- Station family: `station_dock_01`, `station_trade_01`
 - Prompt file: `ship_interceptor_vector_prompt.md`
 - Approved vector spec: `ship_interceptor_01.json`
 
@@ -114,8 +123,8 @@ Every approved source specification must include these fields or their schema
 equivalents:
 
 - `asset_id`: Stable lowercase snake case ID.
-- `category`: `ship`, `asteroid`, `bullet`, `effect`, `presentation`, or
-  `audio`.
+- `category`: `ship`, `asteroid`, `bullet`, `celestial`, `station`,
+  `effect`, `presentation`, or `audio`.
 - `schema_version`: Version of the schema used for validation.
 - `generator`: Provider, tool, or procedural script name when known.
 - `model`: Model name or version when known.

@@ -9,6 +9,8 @@ enum Category {
 	EFFECT,
 	PRESENTATION,
 	AUDIO,
+	CELESTIAL,
+	STATION,
 }
 
 

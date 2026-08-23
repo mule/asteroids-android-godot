@@ -44,8 +44,14 @@ class VectorAssetValidationTests(unittest.TestCase):
                 "asteroid_iron_01",
                 "asteroid_shale_01",
                 "bullet_baseline_01",
+                "celestial_moon_01",
+                "celestial_planet_01",
                 "ship_baseline_01",
                 "ship_delta_01",
+                "ship_freighter_01",
+                "ship_gunship_01",
+                "ship_interceptor_01",
+                "station_dock_01",
             },
         )
 
@@ -109,8 +115,14 @@ class VectorAssetValidationTests(unittest.TestCase):
                     "asteroid_iron_01.json",
                     "asteroid_shale_01.json",
                     "bullet_baseline_01.json",
+                    "celestial_moon_01.json",
+                    "celestial_planet_01.json",
                     "ship_baseline_01.json",
                     "ship_delta_01.json",
+                    "ship_freighter_01.json",
+                    "ship_gunship_01.json",
+                    "ship_interceptor_01.json",
+                    "station_dock_01.json",
                 ],
             )
 

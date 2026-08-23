@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="VectorAssetDefinition" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_definition.gd" id="1_vector_definition"]
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_polygon.gd" id="2_vector_polygon"]
+[ext_resource type="Resource" path="res://assets/generated/materials/celestial_lit_planet.tres" id="3_celestial_lit_planet"]
+
+[sub_resource type="Resource" id="Resource_equatorial_band"]
+script = ExtResource("2_vector_polygon")
+polygon_id = &"equatorial_band"
+polygon = PackedVector2Array(-392, -26, 392, -26, 384, 30, -384, 30)
+fill_color = Color(0.24, 0.3, 0.37, 0.42)
+
+[sub_resource type="Resource" id="Resource_quiet_continent"]
+script = ExtResource("2_vector_polygon")
+polygon_id = &"quiet_continent"
+polygon = PackedVector2Array(-148, -210, -36, -246, 88, -196, 116, -82, 18, -32, -118, -74)
+fill_color = Color(0.2, 0.28, 0.3, 0.5)
+
+[resource]
+script = ExtResource("1_vector_definition")
+asset_id = &"celestial_planet_01"
+category = 6
+primary_polygon = PackedVector2Array(0, -450, 172, -416, 318, -318, 416, -172, 450, 0, 416, 172, 318, 318, 172, 416, 0, 450, -172, 416, -318, 318, -416, 172, -450, 0, -416, -172, -318, -318, -172, -416)
+fill_color = Color(0.18, 0.24, 0.32, 1)
+outline_color = Color(0.26, 0.34, 0.42, 0.55)
+outline_width = 2
+material_definition = ExtResource("3_celestial_lit_planet")
+secondary_polygons = Array[Resource]([SubResource("Resource_equatorial_band"), SubResource("Resource_quiet_continent")])
+collision_radius = 450
+tags = PackedStringArray("background", "planet", "scenery")
+provenance_reference = "art/approved/celestial_planet_01.json"

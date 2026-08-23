@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="VectorAssetDefinition" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_definition.gd" id="1_vector_definition"]
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_polygon.gd" id="2_vector_polygon"]
+[ext_resource type="Resource" path="res://assets/generated/materials/ship_lit_interceptor.tres" id="3_ship_lit_interceptor"]
+[ext_resource type="Resource" path="res://assets/generated/materials/thrust_emissive_interceptor.tres" id="4_thrust_emissive_interceptor"]
+
+[sub_resource type="Resource" id="Resource_thrust_flame"]
+script = ExtResource("2_vector_polygon")
+polygon_id = &"thrust_flame"
+polygon = PackedVector2Array(6, 27, 2, 48, 0, 36, -2, 48, -6, 27)
+fill_color = Color(1, 0.5, 0.16, 0.88)
+material_definition = ExtResource("4_thrust_emissive_interceptor")
+visible_by_default = false
+
+[resource]
+script = ExtResource("1_vector_definition")
+asset_id = &"ship_interceptor_01"
+category = 0
+primary_polygon = PackedVector2Array(0, -30, 15, 18, 6, 30, 0, 22, -6, 30, -15, 18)
+fill_color = Color(0.72, 0.9, 0.96, 1)
+material_definition = ExtResource("3_ship_lit_interceptor")
+secondary_polygons = Array[Resource]([SubResource("Resource_thrust_flame")])
+use_collision_polygon = true
+collision_polygon = PackedVector2Array(0, -28, 14, 18, 5, 28, -5, 28, -14, 18)
+tags = PackedStringArray("class", "interceptor", "ship")
+provenance_reference = "art/approved/ship_interceptor_01.json"

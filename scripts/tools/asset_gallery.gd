@@ -2,11 +2,13 @@ extends Control
 
 
 const DEFAULT_MANIFEST_PATH := "res://assets/generated/manifest.json"
-const CATEGORY_ORDER := ["ship", "asteroid", "bullet"]
+const CATEGORY_ORDER := ["ship", "asteroid", "bullet", "celestial", "station"]
 const CATEGORY_LABELS := {
 	"ship": "Ships",
 	"asteroid": "Asteroids",
 	"bullet": "Bullets",
+	"celestial": "Celestial",
+	"station": "Stations",
 }
 
 

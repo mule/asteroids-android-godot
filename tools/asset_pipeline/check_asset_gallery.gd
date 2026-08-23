@@ -18,7 +18,7 @@ func _init() -> void:
 	var failures: Array[String] = []
 	if gallery.records.size() < 6:
 		failures.append("expected generated records from manifest")
-	for category in ["ship", "asteroid", "bullet"]:
+	for category in ["ship", "asteroid", "bullet", "celestial", "station"]:
 		if gallery._records_for_category(category).is_empty():
 			failures.append("missing category " + category)
 	if gallery.preview_grid.get_child_count() < 1:

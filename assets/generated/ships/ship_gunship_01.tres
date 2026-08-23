@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="VectorAssetDefinition" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_definition.gd" id="1_vector_definition"]
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_polygon.gd" id="2_vector_polygon"]
+[ext_resource type="Resource" path="res://assets/generated/materials/ship_lit_gunship.tres" id="3_ship_lit_gunship"]
+[ext_resource type="Resource" path="res://assets/generated/materials/thrust_emissive_gunship.tres" id="4_thrust_emissive_gunship"]
+
+[sub_resource type="Resource" id="Resource_thrust_flame"]
+script = ExtResource("2_vector_polygon")
+polygon_id = &"thrust_flame"
+polygon = PackedVector2Array(9, 52, 4, 80, 0, 62, -4, 80, -9, 52)
+fill_color = Color(1, 0.45, 0.12, 0.86)
+material_definition = ExtResource("4_thrust_emissive_gunship")
+visible_by_default = false
+
+[resource]
+script = ExtResource("1_vector_definition")
+asset_id = &"ship_gunship_01"
+category = 0
+primary_polygon = PackedVector2Array(0, -55, 20, -22, 35, 26, 14, 42, 8, 55, 0, 44, -8, 55, -14, 42, -35, 26, -20, -22)
+fill_color = Color(0.78, 0.82, 0.86, 1)
+material_definition = ExtResource("3_ship_lit_gunship")
+secondary_polygons = Array[Resource]([SubResource("Resource_thrust_flame")])
+use_collision_polygon = true
+collision_polygon = PackedVector2Array(0, -50, 32, 28, 0, 52, -32, 28)
+tags = PackedStringArray("class", "gunship", "ship")
+provenance_reference = "art/approved/ship_gunship_01.json"

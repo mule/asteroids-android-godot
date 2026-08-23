@@ -1,0 +1,81 @@
+{
+  "schema_version": "vector-asset/v1",
+  "asset_id": "celestial_planet_01",
+  "category": "celestial",
+  "primary_polygon": [
+    [0, -450],
+    [172, -416],
+    [318, -318],
+    [416, -172],
+    [450, 0],
+    [416, 172],
+    [318, 318],
+    [172, 416],
+    [0, 450],
+    [-172, 416],
+    [-318, 318],
+    [-416, 172],
+    [-450, 0],
+    [-416, -172],
+    [-318, -318],
+    [-172, -416]
+  ],
+  "fill_color": [0.18, 0.24, 0.32, 1.0],
+  "outline": {
+    "color": [0.26, 0.34, 0.42, 0.55],
+    "width": 2
+  },
+  "material": {
+    "material_id": "celestial_lit_planet",
+    "shader_mode": "lit_vector",
+    "base_tint": [0.82, 0.88, 0.94, 1.0],
+    "ambient": 0.58,
+    "diffuse_strength": 0.22,
+    "light_band_count": 3,
+    "highlight_strength": 0.06
+  },
+  "secondary_polygons": [
+    {
+      "polygon_id": "equatorial_band",
+      "polygon": [
+        [-392, -26],
+        [392, -26],
+        [384, 30],
+        [-384, 30]
+      ],
+      "fill_color": [0.24, 0.3, 0.37, 0.42]
+    },
+    {
+      "polygon_id": "quiet_continent",
+      "polygon": [
+        [-148, -210],
+        [-36, -246],
+        [88, -196],
+        [116, -82],
+        [18, -32],
+        [-118, -74]
+      ],
+      "fill_color": [0.2, 0.28, 0.3, 0.5]
+    }
+  ],
+  "collision": {
+    "type": "circle",
+    "radius": 450
+  },
+  "tags": ["background", "planet", "scenery"],
+  "provenance": {
+    "generator": "codex",
+    "model": "gpt-5-codex",
+    "prompt_file": "art/prompts/celestial-body.md",
+    "prompt_revision": "issue-50",
+    "created_at": "2026-08-23",
+    "seed": "manual-celestial-planet-01",
+    "manual_edits": "Hand-authored low-contrast planet silhouette and review bands for issue 50.",
+    "source_license": "project-owned",
+    "notes": "Approved distant planet anchor near 900px across; intended as scenery, not gameplay collision."
+  },
+  "approval": {
+    "status": "approved",
+    "reviewer": "codex"
+  }
+}
