@@ -305,8 +305,14 @@ func _get_sector_bounds() -> Rect2:
 func _contain_in_sector() -> void:
 	var bounds := _get_sector_bounds()
 	var radius := get_collision_radius()
-	velocity = WORLD_BOUNDS.reflect_velocity_at_edge(position, velocity, bounds, radius)
-	position = WORLD_BOUNDS.clamp_to_sector(position, bounds, radius)
+	# Sector bounds are world space, so containment reads and writes
+	# global_position. An asteroid seeded by an AsteroidField is parented to
+	# that field, not to Entities, so its own `position` is an offset from the
+	# field centre -- clamping that against a world rect walls every field rock
+	# in at its own field's origin.
+	var world_position := global_position
+	velocity = WORLD_BOUNDS.reflect_velocity_at_edge(world_position, velocity, bounds, radius)
+	global_position = WORLD_BOUNDS.clamp_to_sector(world_position, bounds, radius)
 
 
 func _update_shader_light_direction() -> void:

@@ -9,8 +9,6 @@ const ASTEROID_SMALL := 2
 @export var bullet_scene: PackedScene
 @export var starting_score: int = 0
 @export var starting_wave: int = 1
-@export var initial_asteroid_count: int = 4
-@export var spawn_safe_radius: float = 180.0
 @export var split_child_count: int = 2
 @export var asteroid_collision_damage: float = 25.0
 ## Brief post-damage immunity. Inherited from the deleted respawn cycle so a
@@ -427,18 +425,6 @@ func _on_asteroid_field_cleared(field: Node2D) -> void:
 
 func _on_hud_touch_action_changed(action: StringName, pressed: bool) -> void:
 	player_input.set_touch_action(action, pressed)
-
-
-func _get_safe_spawn_position(index: int, asteroid_count: int) -> Vector2:
-	for attempt in 32:
-		var spawn_position := sector.get_random_position(random)
-
-		if spawn_position.distance_to(player_ship.global_position) >= spawn_safe_radius:
-			return spawn_position
-
-	var fallback_angle := TAU * float(index) / maxf(1.0, float(asteroid_count))
-	var fallback_radius := spawn_safe_radius + 80.0
-	return player_ship.global_position + Vector2.RIGHT.rotated(fallback_angle) * fallback_radius
 
 
 func _get_random_asteroid_velocity(size_tier: int) -> Vector2:

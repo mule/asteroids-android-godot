@@ -140,13 +140,28 @@ func _get_nearest_field_distance(candidate: Vector2) -> float:
 
 	var nearest_distance := INF
 	for field in get_fields():
-		nearest_distance = minf(nearest_distance, candidate.distance_to(field.global_position))
+		# find_free_position samples get_random_position, which works in the
+		# definition's own bounds space, and place_content writes the result
+		# straight to field.position. Compare against the same space rather
+		# than global_position, which would silently drift apart from it the
+		# first time this node is placed anywhere but the origin.
+		nearest_distance = minf(nearest_distance, candidate.distance_to(field.position))
 
 	return nearest_distance
 
 
 func _clear_fields() -> void:
 	for field in _fields:
-		if is_instance_valid(field):
-			field.queue_free()
+		if not is_instance_valid(field):
+			continue
+
+		# Detach before queueing the free. queue_free() only runs at the end of
+		# the frame, and it flags the field alone -- its asteroids would answer
+		# is_queued_for_deletion() with false and stay in the `asteroids` group,
+		# so a restart would count the previous sector's rocks as live. Leaving
+		# the tree drops the whole subtree from its groups now.
+		var parent := field.get_parent()
+		if parent != null:
+			parent.remove_child(field)
+		field.queue_free()
 	_fields.clear()

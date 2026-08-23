@@ -225,17 +225,18 @@ func _test_three_asteroid_cluster(failures: Array[String]) -> void:
 func _test_bullet_destroys_asteroid(failures: Array[String]) -> void:
 	var game_packed := load(GAME_SCENE) as PackedScene
 	var game := game_packed.instantiate()
-	game.initial_asteroid_count = 1
 	game.auto_start = false
 	root.add_child(game)
 	await physics_frame
 	game._start_new_game()
 	await physics_frame
 
-	# Clear initial wave asteroids
-	for child in game.entities.get_children():
-		if child != game.player_ship:
-			child.queue_free()
+	# Clear the sector's seeded asteroids. They are parented to their own
+	# AsteroidField under Sector, not to Entities, so walk the group rather than
+	# the Entities children -- otherwise this test fires its bullet into a
+	# sector still holding every field rock.
+	for asteroid in game.get_tree().get_nodes_in_group("asteroids"):
+		asteroid.queue_free()
 	await physics_frame
 
 	var ast: Area2D = game._spawn_asteroid(0, Vector2(600, 324), Vector2.ZERO)

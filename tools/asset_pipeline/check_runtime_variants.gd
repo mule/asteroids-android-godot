@@ -18,7 +18,7 @@ func _init() -> void:
 	for entry: Dictionary in first:
 		visual_ids[entry["visual_asset_id"]] = true
 	if visual_ids.size() < 2:
-		failures.append("initial wave did not contain multiple asteroid visuals")
+		failures.append("seeded asteroid fields did not contain multiple asteroid visuals")
 
 	var split_snapshot := await _capture_split_snapshot()
 	if split_snapshot.size() != 2:
@@ -42,7 +42,7 @@ func _init() -> void:
 
 
 func _capture_game_snapshot() -> Array:
-	var game := _instantiate_game(8)
+	var game := _instantiate_game()
 	root.add_child(game)
 	await process_frame
 	game._start_new_game()
@@ -53,10 +53,17 @@ func _capture_game_snapshot() -> Array:
 
 
 func _capture_split_snapshot() -> Array:
-	var game := _instantiate_game(0)
+	var game := _instantiate_game()
 	root.add_child(game)
 	await process_frame
 	game._start_new_game()
+	# Starting a run seeds the sector's asteroid fields, and the debug snapshot
+	# reports every rock in the `asteroids` group. This check is about the split
+	# children alone, so clear the field rocks before splitting -- freed outright
+	# rather than queued, because the snapshot is taken in this same frame.
+	for asteroid in game.get_tree().get_nodes_in_group("asteroids"):
+		asteroid.get_parent().remove_child(asteroid)
+		asteroid.free()
 	game._spawn_split_asteroids(ASTEROID_MEDIUM, Vector2(200, 200), Vector2(80, 0))
 	var snapshot := _stable_snapshot(game.get_active_asteroid_debug_snapshot())
 	root.remove_child(game)
@@ -78,11 +85,10 @@ func _fallback_asteroid_has_visual() -> bool:
 	return has_visual
 
 
-func _instantiate_game(initial_count: int) -> Node:
+func _instantiate_game() -> Node:
 	var packed_scene := load(GAME_SCENE) as PackedScene
 	var game := packed_scene.instantiate()
 	game.random_seed = 1729
-	game.initial_asteroid_count = initial_count
 	game.starting_wave = 1
 	game.auto_start = false
 	return game
