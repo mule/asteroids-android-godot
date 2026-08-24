@@ -18,6 +18,9 @@ enum AsteroidSize {
 @export var drift_speed: float = 90.0
 @export var rotation_speed_degrees: float = 25.0
 @export var bounce_restitution: float = 1.0
+## Extra gap left between this rock and a body it has been deflected off,
+## so a rounding error cannot leave the pair technically still touching.
+@export var deflect_clearance: float = 6.0
 
 @onready var rock_shape: Polygon2D = $RockShape
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
@@ -216,6 +219,62 @@ func _resolve_asteroid_collision(other: Area2D) -> void:
 	_contain_in_sector()
 	if other.has_method("_contain_in_sector"):
 		other._contain_in_sector()
+
+
+## Push this rock clear of a body it just struck and send it back outward.
+##
+## Contact with the ship has to *end*, not merely stop being counted. The
+## post-damage window is a timer: when it closes, `monitoring` comes back on,
+## Godot re-evaluates a pair that is still overlapping, and the hull is charged
+## again -- every window, for as long as a slow rock sits on the ship. This is
+## the same separate-then-impulse rule `_resolve_asteroid_collision` already
+## applies to rock-on-rock contact, with the struck body treated as immovable:
+## the ship keeps its own momentum and the rock takes the whole response.
+func deflect_from(origin: Vector2, origin_radius: float, separation_speed: float) -> void:
+	var clearance := origin_radius + get_collision_radius() + deflect_clearance
+	var normal := _get_deflect_normal(origin)
+	var target := _get_contained_position(origin + normal * clearance)
+
+	# The sector wall outranks the deflection: containment clamps a rock shoved
+	# past the edge straight back onto the ship, and a ship pinned against that
+	# edge is exactly the one with no room to dodge. When the wall is in the
+	# way, throw the rock towards open space instead of into it.
+	if target.distance_to(origin) < clearance:
+		var open_space := _get_sector_bounds().get_center() - origin
+		if open_space.length_squared() > 0.01:
+			normal = open_space.normalized()
+			target = _get_contained_position(origin + normal * clearance)
+
+	global_position = target
+
+	# Set the outward speed rather than adding to it, so a rock closing at any
+	# speed leaves at the same one. A rock already leaving faster keeps its own.
+	var outward_speed := velocity.dot(normal)
+	if outward_speed < separation_speed:
+		velocity += normal * (separation_speed - outward_speed)
+
+	_contain_in_sector()
+
+
+func _get_deflect_normal(origin: Vector2) -> Vector2:
+	var away := global_position - origin
+	var distance := away.length()
+
+	if distance > 0.001:
+		return away / distance
+
+	# Dead centre on the struck body leaves no direction to separate along. Back
+	# the rock out the way it came; a rock that is not moving has to pick some
+	# direction, and its own facing is at least reproducible from the seed --
+	# `_resolve_asteroid_collision`'s randf() would make a hit untestable.
+	if velocity.length_squared() > 0.01:
+		return -velocity.normalized()
+
+	return Vector2.RIGHT.rotated(rotation)
+
+
+func _get_contained_position(candidate: Vector2) -> Vector2:
+	return WORLD_BOUNDS.clamp_to_sector(candidate, _get_sector_bounds(), get_collision_radius())
 
 
 func get_visual_asset_id() -> StringName:

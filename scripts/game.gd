@@ -17,6 +17,21 @@ const ASTEROID_SMALL := 2
 ## single collision cannot chain into instant destruction: an asteroid resting
 ## on the ship would otherwise land a hit every physics frame.
 @export var damage_invulnerability_seconds: float = 2.0
+## Outward speed given to an asteroid that has just damaged the ship. The
+## window above only stops the hit being counted; this is what stops the pair
+## touching, so it has to clear the ship's radius well inside one window.
+@export var asteroid_deflect_speed: float = 140.0
+## Fuel returned for clearing a wave -- a quarter tank, 6.25 seconds of thrust,
+## deliberately less than a wave of steady thrusting costs.
+##
+## Interim measure until the stations of #54, which are meant to be the primary
+## refuel and must not be made pointless here. Nothing else in the game refuels:
+## a 100-unit tank at 4/s is 25 seconds of thrust for an entire run, after which
+## every remaining wave is flown at quarter acceleration with no counterplay.
+## This tops the tank up on a beat the player already earns, and it is scoped to
+## the wave loop, which #57 deletes -- so it cannot outlive the gap it fills.
+## It refuels only: hull repair stays a station service, so damage still costs.
+@export var wave_clear_refuel: float = 25.0
 @export var random_seed: int = 1729
 @export var world_light_direction: Vector2 = Vector2(-0.55, -0.83)
 @export var shader_lighting_enabled: bool = true
@@ -139,11 +154,30 @@ func _on_player_ship_area_entered(area: Area2D) -> void:
 	# The hull is the authority on whether the run continues: apply_damage
 	# emits `destroyed` once at zero, and _end_game is connected to it.
 	ship_systems.apply_damage(asteroid_collision_damage)
+	_deflect_asteroid_from_player(area)
 
 	if ship_systems.is_destroyed():
 		return
 
 	_begin_damage_invulnerability()
+
+
+## A damaging hit has to leave the two apart. Nothing else does this any more:
+## the lives model's `_respawn_player` used to move the ship away on every hit,
+## and deleting it left the collision unresolved. The window that replaced it is
+## only a timer -- `set_invulnerable(false)` switches `monitoring` back on, Godot
+## re-reports a pair that never stopped overlapping, and a rock resting on the
+## ship bills 25 hull every window until the run is over. A player who has run
+## the tank dry, on quarter acceleration, cannot fly out from under it.
+func _deflect_asteroid_from_player(asteroid: Area2D) -> void:
+	if not is_instance_valid(asteroid) or not asteroid.has_method("deflect_from"):
+		return
+
+	asteroid.deflect_from(
+		player_ship.global_position,
+		player_ship.get_collision_radius(),
+		asteroid_deflect_speed
+	)
 
 
 func _spawn_wave() -> void:
@@ -241,6 +275,8 @@ func _check_wave_cleared() -> void:
 		return
 
 	wave += 1
+	# Partial, on a beat the player earns. See `wave_clear_refuel`.
+	ship_systems.refuel(wave_clear_refuel)
 	_update_hud()
 	_clear_bullets()
 	_spawn_wave()

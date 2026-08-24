@@ -133,6 +133,24 @@ func _move(delta: float) -> void:
 	position += velocity * delta
 
 
+## The ship's own collision extent, for anything that has to separate from it.
+## Read off the collision shape rather than hard-coded, because
+## `_apply_visual_asset` replaces that shape with the asset's own polygon.
+func get_collision_radius() -> float:
+	var shape := collision_shape.shape
+
+	if shape is CircleShape2D:
+		return (shape as CircleShape2D).radius
+
+	if shape is ConvexPolygonShape2D:
+		var radius := 0.0
+		for point in (shape as ConvexPolygonShape2D).points:
+			radius = maxf(radius, point.length())
+		return radius
+
+	return 0.0
+
+
 func set_sector_bounds(bounds: Rect2) -> void:
 	sector_bounds = bounds
 

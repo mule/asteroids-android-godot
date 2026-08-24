@@ -38,6 +38,9 @@ func _init() -> void:
 	await _test_the_game_runs_on_hull_instead_of_lives(failures)
 	await _test_the_run_ends_when_the_hull_is_gone(failures)
 	await _test_one_frame_of_asteroids_costs_one_hit(failures)
+	await _test_a_rock_resting_on_the_ship_costs_one_hit(failures)
+	await _test_a_hit_against_the_sector_wall_still_separates(failures)
+	await _test_clearing_a_wave_returns_some_fuel(failures)
 	await _test_the_hud_shows_hull_fuel_credits_and_reserve(failures)
 
 	for failure in failures:
@@ -420,3 +423,175 @@ func _test_the_hud_shows_hull_fuel_credits_and_reserve(failures: Array[String]) 
 	root.remove_child(game)
 	game.free()
 	await physics_frame
+
+
+## Start a game with no asteroids in it, so a test owns every rock on screen.
+func _start_empty_game(window_seconds: float = -1.0) -> Node:
+	var game := (load(GAME_SCENE) as PackedScene).instantiate()
+	game.auto_start = false  # Before add_child -- see the note above.
+	if window_seconds > 0.0:
+		game.damage_invulnerability_seconds = window_seconds
+	root.add_child(game)
+	await physics_frame
+	game._start_new_game()
+	await physics_frame
+
+	# Freed rather than destroyed: `handle_bullet_hit` would pay credits and
+	# spawn splits, and this is meant to be an empty sector, not a cleared one.
+	for asteroid in get_nodes_in_group("asteroids"):
+		asteroid.free()
+	await physics_frame
+	return game
+
+
+func _end_game_scene(game: Node) -> void:
+	root.remove_child(game)
+	game.free()
+	await physics_frame
+
+
+## A rock that has settled on the ship must cost one hit, not one per window.
+##
+## The post-damage window only stops the hit being counted. When it closes,
+## `set_invulnerable(false)` switches `monitoring` back on, Godot re-reports the
+## pair -- which never stopped overlapping, because nothing moved either body --
+## and charges the hull again. Measured on the unfixed head, one large rock
+## drifting at 6 px/s took 75 hull in five seconds and was still sitting on the
+## ship at the end. A ship out of fuel limps at quarter acceleration and cannot
+## leave; that is a dead run with no input that changes it.
+func _test_a_rock_resting_on_the_ship_costs_one_hit(failures: Array[String]) -> void:
+	# A short window keeps the suite quick; the timer is real seconds. Three
+	# windows fit inside the 1.5s below, so an unresolved overlap bills three
+	# times over.
+	var game: Node = await _start_empty_game(0.4)
+	var systems: Node = game.ship_systems
+	var player: Area2D = game.player_ship
+	player.set_invulnerable(false)
+	await physics_frame
+
+	var starting_hull: float = systems.hull
+	var rock: Area2D = game._spawn_asteroid(0, player.global_position, Vector2(6.0, 0.0))
+
+	for _step in 90:
+		await physics_frame
+
+	var lost: float = starting_hull - systems.hull
+	if not is_equal_approx(lost, game.asteroid_collision_damage):
+		failures.append(
+			"Repeat damage: one resting rock cost %f hull over three windows, one hit is %f"
+			% [lost, game.asteroid_collision_damage]
+		)
+	if not game.play_active:
+		failures.append("Repeat damage: one rock ended the run by hitting the ship repeatedly")
+
+	if not is_instance_valid(rock):
+		failures.append("Repeat damage: the rock vanished; a hit should deflect it, not consume it")
+	elif rock.get_overlapping_areas().has(player):
+		# The engine's own answer, not a distance guess: this overlap is exactly
+		# what `area_entered` re-reports the moment the window closes.
+		failures.append(
+			"Repeat damage: the rock is still overlapping the ship %f px away once the window closed"
+			% rock.global_position.distance_to(player.global_position)
+		)
+
+	await _end_game_scene(game)
+
+
+## Same defect, at the sector edge -- where deflecting the rock cannot work on
+## its own, because the rock's own containment clamps it straight back onto the
+## ship. Every hit still has to end with the two apart.
+##
+## Counted per hit rather than as a hull total, deliberately: a ship this close
+## to the edge is also being shoved inwards by the soft boundary of #46, fast
+## enough to fly back into the rock it just knocked away. Those are real
+## collisions with real input available, and lumping them into one number would
+## measure the boundary push instead of the thing under test.
+func _test_a_hit_against_the_sector_wall_still_separates(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game(0.4)
+	var systems: Node = game.ship_systems
+	var player: Area2D = game.player_ship
+	var bounds: Rect2 = game.sector.get_bounds()
+	player.global_position = bounds.position + Vector2(2.0, 2.0)
+	player.velocity = Vector2.ZERO
+	player.set_invulnerable(false)
+	await physics_frame
+
+	# Between the ship and the corner, so "away from the ship" is into the wall.
+	var rock: Area2D = game._spawn_asteroid(0, player.global_position - Vector2(30.0, 0.0), Vector2.ZERO)
+	var hits := 0
+	var unresolved := 0
+	var hull_before_frame: float = systems.hull
+
+	for _step in 60:
+		await physics_frame
+
+		if systems.hull >= hull_before_frame:
+			continue
+
+		hits += 1
+		# A physics step is what refreshes an Area2D's overlap list, so ask it
+		# one step after the hit rather than in the middle of the step that
+		# resolved it, where the answer is still the pre-collision one.
+		await physics_frame
+		if is_instance_valid(rock) and rock.get_overlapping_areas().has(player):
+			unresolved += 1
+		hull_before_frame = systems.hull
+
+	if hits == 0:
+		failures.append("Wall pin: a rock spawned on the ship at the sector edge never damaged it")
+	if unresolved > 0:
+		failures.append(
+			"Wall pin: %d of %d hits at the sector edge left the rock sitting on the ship,"
+			% [unresolved, hits]
+			+ " which bills the hull again every window"
+		)
+
+	await _end_game_scene(game)
+
+
+## Fuel has to come back from somewhere before #54 lands.
+##
+## `max_fuel / fuel_burn_per_second` is 25 seconds of thrust for a whole run,
+## and nothing in the game calls `refuel()`: `reset_systems()` runs only on a
+## new game. Without a top-up, reserve thrust is not a setback but the terminal
+## state of every run -- quarter acceleration for the rest of it, against waves
+## that keep getting faster. A wave clear returns part of a tank, never all of
+## it: stations are #54's job and must stay worth flying to.
+func _test_clearing_a_wave_returns_some_fuel(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var systems: Node = game.ship_systems
+	var reserve_reports: Array[bool] = []
+
+	for _step in 100:
+		systems.consume_fuel(1.0)
+
+	if systems.fuel > 0.0:
+		failures.append("Wave refuel: the tank should start this test empty, holds %f" % systems.fuel)
+
+	systems.reserve_thrust_changed.connect(func(active: bool) -> void: reserve_reports.append(active))
+	var wave_before: int = game.wave
+	game._check_wave_cleared()
+	await physics_frame
+
+	if game.wave <= wave_before:
+		failures.append("Wave refuel: an empty sector did not advance the wave")
+	if systems.fuel <= 0.0:
+		failures.append(
+			"Wave refuel: clearing a wave left the tank dry -- every run is locked on reserve"
+		)
+	if systems.fuel > systems.max_fuel * 0.5:
+		# Deliberately a bound on the design rather than the exact constant:
+		# a wave clear is a top-up, so that docking at a station in #54 is still
+		# the thing worth crossing the sector for. Tuning the amount is free;
+		# turning it into a full tank is the change this refuses.
+		failures.append(
+			"Wave refuel: a wave clear returned %f of a %f tank; stations (#54) must stay the"
+			% [systems.fuel, systems.max_fuel]
+			+ " primary refuel"
+		)
+	if reserve_reports != [false]:
+		failures.append(
+			"Wave refuel: reserve thrust should end when fuel returns, reported %s" % [reserve_reports]
+		)
+
+	await _end_game_scene(game)
