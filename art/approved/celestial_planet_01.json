@@ -3,22 +3,22 @@
   "asset_id": "celestial_planet_01",
   "category": "celestial",
   "primary_polygon": [
-    [0, -450],
-    [172, -416],
-    [318, -318],
-    [416, -172],
-    [450, 0],
-    [416, 172],
-    [318, 318],
-    [172, 416],
-    [0, 450],
-    [-172, 416],
-    [-318, 318],
-    [-416, 172],
-    [-450, 0],
-    [-416, -172],
-    [-318, -318],
-    [-172, -416]
+    [0, -200],
+    [76, -185],
+    [141, -141],
+    [185, -76],
+    [200, 0],
+    [185, 76],
+    [141, 141],
+    [76, 185],
+    [0, 200],
+    [-76, 185],
+    [-141, 141],
+    [-185, 76],
+    [-200, 0],
+    [-185, -76],
+    [-141, -141],
+    [-76, -185]
   ],
   "fill_color": [0.18, 0.24, 0.32, 1.0],
   "outline": {
@@ -38,29 +38,29 @@
     {
       "polygon_id": "equatorial_band",
       "polygon": [
-        [-392, -26],
-        [392, -26],
-        [384, 30],
-        [-384, 30]
+        [-174, -12],
+        [174, -12],
+        [171, 13],
+        [-171, 13]
       ],
       "fill_color": [0.24, 0.3, 0.37, 0.42]
     },
     {
       "polygon_id": "quiet_continent",
       "polygon": [
-        [-148, -210],
-        [-36, -246],
-        [88, -196],
-        [116, -82],
-        [18, -32],
-        [-118, -74]
+        [-66, -93],
+        [-16, -109],
+        [39, -87],
+        [52, -36],
+        [8, -14],
+        [-52, -33]
       ],
       "fill_color": [0.2, 0.28, 0.3, 0.5]
     }
   ],
   "collision": {
     "type": "circle",
-    "radius": 450
+    "radius": 200
   },
   "tags": ["background", "planet", "scenery"],
   "provenance": {
@@ -72,7 +72,7 @@
     "seed": "manual-celestial-planet-01",
     "manual_edits": "Hand-authored low-contrast planet silhouette and review bands for issue 50.",
     "source_license": "project-owned",
-    "notes": "Approved distant planet anchor near 900px across; intended as scenery, not gameplay collision."
+    "notes": "Approved distant planet anchor near 400px across; intended as scenery, not gameplay collision. Rescaled from the 900px proposal in issue 50 during review of #71: at 1:1 world-to-screen 900px overflowed the viewport and two planets at min_landmark_separation were tangent."
   },
   "approval": {
     "status": "approved",

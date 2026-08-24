@@ -24,7 +24,7 @@ Use the existing polygon scenes as the first scale reference:
 - Asteroid: roughly 86 pixels across before size-tier scaling.
 - Bullet: roughly 12 pixels wide and 16 pixels tall.
 - Moon: roughly 260 pixels across.
-- Planet: roughly 900 pixels across.
+- Planet: roughly 400 pixels across.
 - Space station: roughly 320 pixels across, with docking approach geometry
   readable from the silhouette.
 - Interceptor ship: roughly 30 pixels wide and 60 pixels tall, 78 including

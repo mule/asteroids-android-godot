@@ -26,14 +26,14 @@ CATEGORY_LIMITS = {
     "ship": {"max_width": 128.0, "max_height": 200.0, "min_height": 16.0},
     "asteroid": {"max_width": 128.0, "max_height": 128.0, "min_height": 16.0},
     "bullet": {"max_width": 32.0, "max_height": 40.0, "min_height": 4.0},
-    "celestial": {"max_width": 920.0, "max_height": 920.0, "min_height": 120.0},
+    "celestial": {"max_width": 420.0, "max_height": 420.0, "min_height": 120.0},
     "station": {"max_width": 360.0, "max_height": 360.0, "min_height": 120.0},
 }
 COLLISION_RADIUS_LIMITS = {
     "ship": 110.0,
     "asteroid": 80.0,
     "bullet": 24.0,
-    "celestial": 480.0,
+    "celestial": 220.0,
     "station": 190.0,
 }
 

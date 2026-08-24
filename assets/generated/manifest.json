@@ -97,7 +97,7 @@
       "output_path": "assets/generated/celestial/celestial_planet_01.tres",
       "schema_version": "vector-asset/v1",
       "source_path": "art/approved/celestial_planet_01.json",
-      "source_sha256": "0467b9552f1ef77a20fc13ccaa483f4c7a4c36b36600534cdbfabc70c225dff6"
+      "source_sha256": "b09e4691a4804095cd2b2dedb28f923e2962305ade7aa176eb09ef5f15cbb335"
     },
     {
       "asset_id": "ship_baseline_01",

@@ -134,7 +134,11 @@ equivalents:
 - `seed`: Seed value when available.
 - `manual_edits`: Human edits made after generation.
 - `approval_status`: `draft`, `approved`, or `rejected`.
-- `reviewer`: GitHub handle or local reviewer name for approved assets.
+- `reviewer`: GitHub handle or local reviewer name for approved assets. An
+  agent name is a legitimate value here, including when it matches
+  `generator` — art in this repo may be self-approved by the agent that
+  produced it. Record who actually signed off; never substitute a human
+  handle for a review that human did not perform.
 - `source_license`: License, ownership note, or source restriction.
 - `notes`: Short review notes that explain meaningful decisions.
 

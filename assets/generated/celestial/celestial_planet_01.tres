@@ -7,25 +7,25 @@
 [sub_resource type="Resource" id="Resource_equatorial_band"]
 script = ExtResource("2_vector_polygon")
 polygon_id = &"equatorial_band"
-polygon = PackedVector2Array(-392, -26, 392, -26, 384, 30, -384, 30)
+polygon = PackedVector2Array(-174, -12, 174, -12, 171, 13, -171, 13)
 fill_color = Color(0.24, 0.3, 0.37, 0.42)
 
 [sub_resource type="Resource" id="Resource_quiet_continent"]
 script = ExtResource("2_vector_polygon")
 polygon_id = &"quiet_continent"
-polygon = PackedVector2Array(-148, -210, -36, -246, 88, -196, 116, -82, 18, -32, -118, -74)
+polygon = PackedVector2Array(-66, -93, -16, -109, 39, -87, 52, -36, 8, -14, -52, -33)
 fill_color = Color(0.2, 0.28, 0.3, 0.5)
 
 [resource]
 script = ExtResource("1_vector_definition")
 asset_id = &"celestial_planet_01"
 category = 6
-primary_polygon = PackedVector2Array(0, -450, 172, -416, 318, -318, 416, -172, 450, 0, 416, 172, 318, 318, 172, 416, 0, 450, -172, 416, -318, 318, -416, 172, -450, 0, -416, -172, -318, -318, -172, -416)
+primary_polygon = PackedVector2Array(0, -200, 76, -185, 141, -141, 185, -76, 200, 0, 185, 76, 141, 141, 76, 185, 0, 200, -76, 185, -141, 141, -185, 76, -200, 0, -185, -76, -141, -141, -76, -185)
 fill_color = Color(0.18, 0.24, 0.32, 1)
 outline_color = Color(0.26, 0.34, 0.42, 0.55)
 outline_width = 2
 material_definition = ExtResource("3_celestial_lit_planet")
 secondary_polygons = Array[Resource]([SubResource("Resource_equatorial_band"), SubResource("Resource_quiet_continent")])
-collision_radius = 450
+collision_radius = 200
 tags = PackedStringArray("background", "planet", "scenery")
 provenance_reference = "art/approved/celestial_planet_01.json"

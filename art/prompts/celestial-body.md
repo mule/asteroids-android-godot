@@ -16,7 +16,7 @@ Output constraints:
 - Use `category: "celestial"`.
 - Use asset IDs like `celestial_planet_01` and `celestial_moon_01`.
 - Keep the primary polygon centered near the origin.
-- Keep the moon near 260 pixels across and the planet near 900 pixels across.
+- Keep the moon near 260 pixels across and the planet near 400 pixels across.
 - Use broad, simple rounded silhouettes with 10-18 vertices.
 - Avoid high-contrast outlines, baked directional shadows, and obstacle-like
   crags.
