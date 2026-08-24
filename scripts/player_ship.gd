@@ -21,6 +21,7 @@ signal boundary_warning_changed(active: bool)
 @onready var ship_shape: Polygon2D = $ShipShape
 @onready var thrust_flame: Polygon2D = $ThrustFlame
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
+@onready var ship_systems: ShipSystems = $ShipSystems
 @onready var input_source: Node = get_node_or_null(input_source_path)
 
 var velocity: Vector2 = Vector2.ZERO
@@ -71,9 +72,22 @@ func _apply_thrust_input(delta: float) -> void:
 	var is_thrusting := _is_thrust_pressed()
 	thrust_flame.visible = is_thrusting
 
-	if is_thrusting:
-		velocity += Vector2.UP.rotated(rotation) * acceleration * delta
-		velocity = velocity.limit_length(max_speed)
+	if not is_thrusting:
+		return
+
+	# Read the factor before burning, so the frame that empties the tank is
+	# still a full-power frame; reserve thrust starts on the next one.
+	var factor := _get_thrust_factor()
+	ship_systems.consume_fuel(delta)
+	velocity += Vector2.UP.rotated(rotation) * acceleration * factor * delta
+	velocity = velocity.limit_length(max_speed)
+
+
+## Fuel gates thrust but never removes it -- see ShipSystems.reserve_thrust_factor.
+## The sector boundary push in _contain_in_sector is deliberately not gated: it
+## is a world force, and a dry ship pinned on the wall still has to be let go.
+func _get_thrust_factor() -> float:
+	return ship_systems.get_thrust_factor()
 
 
 func _apply_shoot_input() -> void:
@@ -117,6 +131,24 @@ func _apply_drift(delta: float) -> void:
 
 func _move(delta: float) -> void:
 	position += velocity * delta
+
+
+## The ship's own collision extent, for anything that has to separate from it.
+## Read off the collision shape rather than hard-coded, because
+## `_apply_visual_asset` replaces that shape with the asset's own polygon.
+func get_collision_radius() -> float:
+	var shape := collision_shape.shape
+
+	if shape is CircleShape2D:
+		return (shape as CircleShape2D).radius
+
+	if shape is ConvexPolygonShape2D:
+		var radius := 0.0
+		for point in (shape as ConvexPolygonShape2D).points:
+			radius = maxf(radius, point.length())
+		return radius
+
+	return 0.0
 
 
 func set_sector_bounds(bounds: Rect2) -> void:
@@ -187,6 +219,14 @@ func set_invulnerable(value: bool) -> void:
 	set_deferred("monitoring", not value)
 	set_deferred("monitorable", not value)
 	modulate = Color(1.0, 1.0, 1.0, 0.45) if value else Color.WHITE
+
+
+## Read this rather than the deferred `monitoring` flag. `set_invulnerable`
+## can only turn overlap detection off at the end of the frame, so every
+## `area_entered` already queued for the current physics step still arrives
+## after the ship became invulnerable; this answers truthfully in that gap.
+func is_invulnerable() -> bool:
+	return invulnerable
 
 
 func set_shader_lighting_enabled(value: bool) -> void:

@@ -1,7 +1,8 @@
-[gd_scene load_steps=4 format=3 uid="uid://c3o6vlwt3smug"]
+[gd_scene load_steps=5 format=3 uid="uid://c3o6vlwt3smug"]
 
 [ext_resource type="Script" path="res://scripts/player_ship.gd" id="1_1sojc"]
 [ext_resource type="Resource" path="res://assets/generated/ships/ship_delta_01.tres" id="2_a4c52"]
+[ext_resource type="Script" path="res://scripts/entities/ship_systems.gd" id="3_systems"]
 
 [sub_resource type="ConvexPolygonShape2D" id="ConvexPolygonShape2D_jvily"]
 points = PackedVector2Array(0, -28, 18, 22, -18, 22)
@@ -23,3 +24,6 @@ color = Color(1, 0.596078, 0.196078, 0.92)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("ConvexPolygonShape2D_jvily")
+
+[node name="ShipSystems" type="Node" parent="."]
+script = ExtResource("3_systems")

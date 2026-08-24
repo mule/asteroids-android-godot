@@ -7,7 +7,7 @@ signal restart_requested
 signal touch_action_changed(action: StringName, pressed: bool)
 
 @onready var score_label: Label = $Root/TopBar/ScoreLabel
-@onready var lives_label: Label = $Root/TopBar/LivesLabel
+@onready var credits_label: Label = $Root/TopBar/CreditsLabel
 @onready var wave_label: Label = $Root/TopBar/WaveLabel
 @onready var pause_button: Button = $Root/TopBar/PauseButton
 @onready var restart_button: Button = $Root/TopBar/RestartButton
@@ -22,8 +22,14 @@ signal touch_action_changed(action: StringName, pressed: bool)
 @onready var touch_thrust_button: Button = $Root/TouchControls/RightCluster/ThrustButton
 @onready var touch_shoot_button: Button = $Root/TouchControls/RightCluster/ShootButton
 @onready var boundary_warning: Label = $Root/BoundaryWarning
+@onready var systems_panel: VBoxContainer = $Root/SystemsPanel
+@onready var hull_bar: ProgressBar = $Root/SystemsPanel/HullBar
+@onready var fuel_bar: ProgressBar = $Root/SystemsPanel/FuelBar
+@onready var reserve_label: Label = $Root/SystemsPanel/ReserveLabel
+@onready var sector_label: Label = $Root/SystemsPanel/SectorLabel
 
 var current_score: int = 0
+var current_credits: int = 0
 var current_wave: int = 1
 
 
@@ -44,8 +50,28 @@ func set_score(value: int) -> void:
 	score_label.text = "Score %d" % value
 
 
-func set_lives(value: int) -> void:
-	lives_label.text = "Lives %d" % value
+func set_hull(current: float, maximum: float) -> void:
+	hull_bar.max_value = maxf(1.0, maximum)
+	hull_bar.value = current
+	hull_bar.tooltip_text = "Hull %d / %d" % [roundi(current), roundi(maximum)]
+
+
+func set_fuel(current: float, maximum: float) -> void:
+	fuel_bar.max_value = maxf(1.0, maximum)
+	fuel_bar.value = current
+	fuel_bar.tooltip_text = "Fuel %d / %d" % [roundi(current), roundi(maximum)]
+
+
+func set_credits(amount: int) -> void:
+	current_credits = amount
+	credits_label.text = "Credits %d" % amount
+
+
+## A dry ship still flies, at a quarter power. Without a visible cause the
+## player reads that as the controls breaking, so the indicator is not
+## decoration -- it is the explanation for why the ship feels sluggish.
+func set_reserve_thrust(active: bool) -> void:
+	reserve_label.visible = active
 
 
 func set_wave(value: int) -> void:
@@ -55,7 +81,7 @@ func set_wave(value: int) -> void:
 
 func show_paused() -> void:
 	status_title_label.text = "Paused"
-	status_body_label.text = "Score %d  Wave %d" % [current_score, current_wave]
+	status_body_label.text = _get_status_body(current_score)
 	resume_button.visible = true
 	overlay_restart_button.visible = true
 	status_panel.visible = true
@@ -64,7 +90,8 @@ func show_paused() -> void:
 
 func show_game_over(final_score: int, wave: int) -> void:
 	status_title_label.text = "Game Over"
-	status_body_label.text = "Score %d  Wave %d" % [final_score, wave]
+	current_wave = wave
+	status_body_label.text = _get_status_body(final_score)
 	resume_button.visible = false
 	overlay_restart_button.visible = true
 	status_panel.visible = true
@@ -79,6 +106,14 @@ func hide_status() -> void:
 
 func set_pause_available(value: bool) -> void:
 	pause_button.disabled = not value
+
+
+func set_sector(sector_name: String, sector_seed: int) -> void:
+	sector_label.text = "Sector %s  Seed %d" % [sector_name, sector_seed]
+
+
+func _get_status_body(final_score: int) -> String:
+	return "Score %d  Credits %d  Wave %d" % [final_score, current_credits, current_wave]
 
 
 func set_boundary_warning(active: bool) -> void:

@@ -31,10 +31,10 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "Score 0"
 
-[node name="LivesLabel" type="Label" parent="Root/TopBar"]
+[node name="CreditsLabel" type="Label" parent="Root/TopBar"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Lives 3"
+text = "Credits 0"
 
 [node name="WaveLabel" type="Label" parent="Root/TopBar"]
 layout_mode = 2
@@ -52,6 +52,42 @@ custom_minimum_size = Vector2(82, 44)
 layout_mode = 2
 focus_mode = 0
 text = "Restart"
+
+[node name="SystemsPanel" type="VBoxContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 0
+offset_left = 12.0
+offset_top = 62.0
+offset_right = 232.0
+offset_bottom = 168.0
+theme_override_constants/separation = 4
+
+[node name="HullBar" type="ProgressBar" parent="Root/SystemsPanel"]
+custom_minimum_size = Vector2(220, 18)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+tooltip_text = "Hull 100 / 100"
+
+[node name="FuelBar" type="ProgressBar" parent="Root/SystemsPanel"]
+custom_minimum_size = Vector2(220, 18)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+tooltip_text = "Fuel 100 / 100"
+
+[node name="ReserveLabel" type="Label" parent="Root/SystemsPanel"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.75, 0.2, 1)
+text = "RESERVE THRUST"
+
+[node name="SectorLabel" type="Label" parent="Root/SystemsPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.78, 0.9, 1)
+text = "Sector --  Seed 0"
 
 [node name="BoundaryWarning" type="Label" parent="Root"]
 visible = false
