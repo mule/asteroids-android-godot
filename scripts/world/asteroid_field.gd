@@ -18,7 +18,7 @@ func seed_field(rng: RandomNumberGenerator, asteroid_scene: PackedScene, visual_
 	_cleared_emitted = false
 
 	if asteroid_scene == null:
-		_emit_cleared_if_ready()
+		_latch_empty_field()
 		return
 
 	for index in maxi(0, asteroid_budget):
@@ -38,7 +38,7 @@ func seed_field(rng: RandomNumberGenerator, asteroid_scene: PackedScene, visual_
 		if asteroid.has_signal("destroyed"):
 			asteroid.connect("destroyed", _on_asteroid_destroyed)
 
-	_emit_cleared_if_ready()
+	_latch_empty_field()
 
 
 func get_active_asteroid_count() -> int:
@@ -57,6 +57,27 @@ func _on_asteroid_destroyed(
 ) -> void:
 	_active_asteroids = maxi(0, _active_asteroids - 1)
 	_emit_cleared_if_ready()
+
+
+## Seeding is not a clear.
+##
+## `game.gd`'s `_place_sector_content` connects `field_cleared` to the
+## field-clear refuel BEFORE it calls `seed_field`, so anything emitted while
+## seeding is paid out before the run has started. A field that ends up holding
+## nothing -- an `asteroid_budget` of 0, or a null `asteroid_scene`, both legal
+## on the exported SectorDefinition -- was never emptied by the player, and
+## emitting for it handed out `field_clear_refuel` per field for a sector
+## nobody had touched: the shipped five fields at a quarter tank each is more
+## than the whole 100-unit tank that refuel is deliberately scoped to stay
+## under, collected before the first shot.
+##
+## Latching `_cleared_emitted` rather than emitting keeps the signal a
+## transition -- the beat a destroyed asteroid makes -- and stops a later
+## destroy on some other field's rock finding this one still armed.
+## `is_cleared()` continues to report the STATE for anything that polls.
+func _latch_empty_field() -> void:
+	if _active_asteroids <= 0:
+		_cleared_emitted = true
 
 
 func _emit_cleared_if_ready() -> void:
