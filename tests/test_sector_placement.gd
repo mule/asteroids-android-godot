@@ -18,6 +18,7 @@ func _init() -> void:
 	await _test_field_seeding_keeps_asteroid_group_membership(failures)
 	await _test_a_field_rock_scores_splits_and_refuels(failures)
 	await _test_seeding_an_empty_field_is_not_a_clear(failures)
+	await _test_the_sector_clear_check_waits_for_the_splits(failures)
 	_test_game_no_longer_owns_spawn_wave(failures)
 
 	for failure in failures:
@@ -370,3 +371,86 @@ func _test_seeding_an_empty_field_is_not_a_clear(failures: Array[String]) -> voi
 
 	field.queue_free()
 	await physics_frame
+
+
+## The sector-clear beat must not run before the rock that triggered it has
+## spawned its children.
+##
+## Two handlers sit on a field rock's `destroyed`, and `_place_sector_content`
+## connects them in this order: `seed_field` wires the field's own counter
+## first, `_wire_field_asteroids` wires the game's second. So the last rock of a
+## field emits in this order -- field counter hits zero, `field_cleared` fires,
+## `_on_asteroid_field_cleared` queues a sector-clear check; only THEN does the
+## game's own handler queue the split spawn and its own check. Deferred calls
+## flush FIFO, so the field's check ran first, at the one moment the sector
+## looks empty: the destroyed rock is already queued for deletion and its
+## splits do not exist yet. `_clear_bullets()` deleted the player's shots in
+## flight and the cleared flash played, and two mediums then appeared out of the
+## flash.
+##
+## The queued check was redundant to begin with: `field_cleared` can only fire
+## from a rock's `destroyed`, and that same signal already reaches
+## `_on_asteroid_destroyed`, which queues the check after the split spawn.
+func _test_the_sector_clear_check_waits_for_the_splits(failures: Array[String]) -> void:
+	var game := (load(GAME_SCENE) as PackedScene).instantiate()
+	game.auto_start = false
+	root.add_child(game)
+	await physics_frame
+	game._start_new_game()
+	await physics_frame
+	game.player_ship.set_invulnerable(true)
+
+	var fields: Array[Node2D] = game.sector.get_fields()
+	if fields.is_empty():
+		failures.append("Split ordering: starting a run placed no asteroid fields")
+		await _free_game(game)
+		return
+
+	# Re-seed one field down to a single rock through the public API, then empty
+	# every other field, so this rock's death is both its field's clear and the
+	# sector's last asteroid -- the only state the ordering shows in.
+	var field: Node2D = fields[0]
+	field.asteroid_budget = 1
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20260825
+	field.seed_field(rng, game.asteroid_scene, game.asteroid_visual_assets)
+	game._wire_field_asteroids(field)
+
+	for other in fields:
+		if other != field:
+			for rock in _field_rocks(other):
+				rock.free()
+	for child in game.entities.get_children():
+		if child.is_in_group("asteroids"):
+			child.free()
+	await physics_frame
+
+	var rocks := _field_rocks(field)
+	if rocks.size() != 1:
+		failures.append(
+			"Split ordering: expected one rock left in %s, found %d"
+			% [field.field_name, rocks.size()]
+		)
+		await _free_game(game)
+		return
+
+	# Stands in for a shot still in flight -- a member of the group
+	# `_clear_bullets` walks. A real bullet would tie the assertion to wherever
+	# the field happened to land relative to the ship.
+	var in_flight := Node2D.new()
+	in_flight.add_to_group("bullets")
+	game.entities.add_child(in_flight)
+
+	rocks[0].handle_bullet_hit(null)
+	await physics_frame
+	await physics_frame
+
+	if not is_instance_valid(in_flight) or in_flight.is_queued_for_deletion():
+		failures.append(
+			"Split ordering: the sector-clear check ran before the last rock's"
+			+ " splits existed and destroyed a shot still in flight"
+		)
+	if _entity_rock_count(game) <= 0:
+		failures.append("Split ordering: the last rock spawned no splits, so the test never reached the beat it guards")
+
+	await _free_game(game)

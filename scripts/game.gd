@@ -417,10 +417,20 @@ func _wire_field_asteroids(field: Node2D) -> void:
 				asteroid.connect("destroyed", callback)
 
 
+## Deliberately does NOT queue `_check_asteroid_fields_cleared`.
+##
+## `field_cleared` can only reach here from a rock's `destroyed`, and that same
+## signal already reaches `_on_asteroid_destroyed`, which queues the check --
+## after the split spawn. Queueing it here as well ran it FIRST: the field's
+## counter is wired in `seed_field` and the game's handler only later in
+## `_wire_field_asteroids`, so on the last rock of the last field this call
+## landed ahead of both, at the one moment the sector looks empty. The rock is
+## already queued for deletion and its splits do not exist, so the check saw
+## zero asteroids, `_clear_bullets()` deleted the player's shots in flight and
+## the cleared flash played -- and two mediums then appeared out of it.
 func _on_asteroid_field_cleared(field: Node2D) -> void:
 	# Partial, on a beat the player earns. See `field_clear_refuel`.
 	ship_systems.refuel(field_clear_refuel)
-	call_deferred("_check_asteroid_fields_cleared")
 
 
 func _on_hud_touch_action_changed(action: StringName, pressed: bool) -> void:
