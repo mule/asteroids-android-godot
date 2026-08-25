@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="VectorAssetDefinition" load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_definition.gd" id="1_vector_definition"]
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_polygon.gd" id="2_vector_polygon"]
+[ext_resource type="Resource" path="res://assets/generated/materials/station_lit_dock.tres" id="3_station_lit_dock"]
+[ext_resource type="Resource" path="res://assets/generated/materials/station_emissive_dock.tres" id="4_station_emissive_dock"]
+
+[sub_resource type="Resource" id="Resource_dock_approach"]
+script = ExtResource("2_vector_polygon")
+polygon_id = &"dock_approach"
+polygon = PackedVector2Array(20, -26, 174, -26, 174, 26, 20, 26)
+fill_color = Color(0.12, 0.5, 0.66, 0.9)
+material_definition = ExtResource("4_station_emissive_dock")
+
+[sub_resource type="Resource" id="Resource_central_hub"]
+script = ExtResource("2_vector_polygon")
+polygon_id = &"central_hub"
+polygon = PackedVector2Array(0, -70, 50, -50, 70, 0, 50, 50, 0, 70, -50, 50, -70, 0, -50, -50)
+fill_color = Color(0.38, 0.43, 0.46, 1)
+
+[sub_resource type="Resource" id="Resource_left_panel"]
+script = ExtResource("2_vector_polygon")
+polygon_id = &"left_panel"
+polygon = PackedVector2Array(-130, -20, -72, -48, -46, -18, -72, 48, -130, 20)
+fill_color = Color(0.62, 0.64, 0.62, 1)
+
+[resource]
+script = ExtResource("1_vector_definition")
+asset_id = &"station_dock_01"
+category = 7
+primary_polygon = PackedVector2Array(0, -160, 96, -112, 160, 0, 96, 112, 0, 160, -96, 112, -160, 0, -96, -112)
+fill_color = Color(0.52, 0.56, 0.58, 1)
+outline_color = Color(0.8, 0.86, 0.86, 0.72)
+outline_width = 2.5
+material_definition = ExtResource("3_station_lit_dock")
+secondary_polygons = Array[Resource]([SubResource("Resource_dock_approach"), SubResource("Resource_central_hub"), SubResource("Resource_left_panel")])
+collision_radius = 170
+tags = PackedStringArray("dock", "infrastructure", "station")
+provenance_reference = "art/approved/station_dock_01.json"

@@ -28,6 +28,8 @@ class VectorAssetBuildTests(unittest.TestCase):
             self.assertIn("ships/ship_baseline_01.tres", paths)
             self.assertIn("asteroids/asteroid_baseline_01.tres", paths)
             self.assertIn("bullets/bullet_baseline_01.tres", paths)
+            self.assertIn("celestial/celestial_planet_01.tres", paths)
+            self.assertIn("stations/station_dock_01.tres", paths)
             self.assertIn("materials/ship_lit_baseline.tres", paths)
 
     def test_cli_check_detects_stale_file(self) -> None:

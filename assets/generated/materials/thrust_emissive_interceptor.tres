@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="AssetMaterialDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/asset_material_definition.gd" id="1_material_definition"]
+[ext_resource type="Shader" path="res://assets/shaders/emissive_unlit.gdshader" id="2_shader"]
+
+[resource]
+script = ExtResource("1_material_definition")
+material_id = &"thrust_emissive_interceptor"
+shader_mode = 3
+shader = ExtResource("2_shader")
+emission_color = Color(1, 0.32, 0.08, 1)
+emission_intensity = 0.58

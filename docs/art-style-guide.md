@@ -23,6 +23,20 @@ Use the existing polygon scenes as the first scale reference:
 - Player ship: roughly 36 pixels wide and 78 pixels tall including thrust.
 - Asteroid: roughly 86 pixels across before size-tier scaling.
 - Bullet: roughly 12 pixels wide and 16 pixels tall.
+- Moon: roughly 260 pixels across.
+- Planet: roughly 400 pixels across.
+- Space station: roughly 320 pixels across, with docking approach geometry
+  readable from the silhouette.
+- Interceptor ship: roughly 30 pixels wide and 60 pixels tall, 78 including
+  thrust.
+- Gunship: roughly 70 pixels wide and 110 pixels tall, 135 including thrust.
+- Freighter: roughly 120 pixels wide and 190 pixels tall, 219 including thrust.
+
+Ship heights are quoted hull-first, then with the thrust flame, because the two
+differ enough to mislead: the player ship's 78 is a with-thrust figure over a
+36x50 hull, and the interceptor's hull-only 60 is also 78 once thrust is
+included. Validator limits in `tools/asset_pipeline/validate_assets.py` bound
+the hull polygon only, so compare hull figures when reading them.
 
 At normal gameplay zoom, a player should recognize the ship nose, asteroid
 outline, and bullet direction without pausing. At enlarged gallery scale, the
@@ -32,6 +46,10 @@ same asset may show extra contour detail, paneling, facets, or impact marks.
 
 - Ships need a clear forward point and balanced left/right profile.
 - Asteroids should have irregular outlines with no fragile needle-like spikes.
+- Planets and moons should read as distant scenery: large, calm, and lower
+  contrast than collision-critical entities.
+- Stations should expose a clear dock approach silhouette that remains legible
+  before any tutorial copy or docking UI exists.
 - Bullets should be compact, high contrast, and readable while moving quickly.
 - Avoid tiny interior features that only work in an enlarged preview.
 - Collision geometry may stay simpler than the visible outline.
@@ -43,6 +61,10 @@ Use a limited palette per asset family:
 - Ship hulls: pale neutral fills, cool metal tints, or restrained accent colors.
 - Thruster effects: warm orange, amber, or yellow with controlled transparency.
 - Asteroids: neutral gray, blue gray, slate, or muted mineral colors.
+- Celestial bodies: low-saturation blues, violets, grays, or muted mineral
+  tones with restrained contrast so they never compete with asteroids.
+- Stations: neutral albedo panels with small, purposeful accent colors around
+  docking geometry.
 - Bullets: bright yellow, white, cyan, or green when the gameplay state needs a
   distinct read.
 

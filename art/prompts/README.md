@@ -22,4 +22,7 @@ Prompts:
 - [asteroid-silhouette.md](asteroid-silhouette.md)
 - [ship-silhouette.md](ship-silhouette.md)
 - [bullet-projectile.md](bullet-projectile.md)
+- [celestial-body.md](celestial-body.md)
+- [space-station.md](space-station.md)
+- [ship-classes.md](ship-classes.md)
 - [concept-sheet.md](concept-sheet.md)

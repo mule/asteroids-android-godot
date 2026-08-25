@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="AssetMaterialDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/asset_material_definition.gd" id="1_material_definition"]
+[ext_resource type="Shader" path="res://assets/shaders/vector_lit.gdshader" id="2_shader"]
+
+[resource]
+script = ExtResource("1_material_definition")
+material_id = &"celestial_lit_moon"
+shader_mode = 1
+shader = ExtResource("2_shader")
+base_tint = Color(0.86, 0.86, 0.9, 1)
+ambient = 0.5
+diffuse_strength = 0.28
+light_band_count = 3
+highlight_strength = 0.07

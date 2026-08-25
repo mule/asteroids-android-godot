@@ -1,0 +1,78 @@
+{
+  "schema_version": "vector-asset/v1",
+  "asset_id": "celestial_moon_01",
+  "category": "celestial",
+  "primary_polygon": [
+    [0, -130],
+    [65, -113],
+    [113, -65],
+    [130, 0],
+    [113, 65],
+    [65, 113],
+    [0, 130],
+    [-65, 113],
+    [-113, 65],
+    [-130, 0],
+    [-113, -65],
+    [-65, -113]
+  ],
+  "fill_color": [0.38, 0.4, 0.44, 1.0],
+  "outline": {
+    "color": [0.56, 0.58, 0.62, 0.45],
+    "width": 1.5
+  },
+  "material": {
+    "material_id": "celestial_lit_moon",
+    "shader_mode": "lit_vector",
+    "base_tint": [0.86, 0.86, 0.9, 1.0],
+    "ambient": 0.5,
+    "diffuse_strength": 0.28,
+    "light_band_count": 3,
+    "highlight_strength": 0.07
+  },
+  "secondary_polygons": [
+    {
+      "polygon_id": "mare_patch",
+      "polygon": [
+        [-58, -28],
+        [-16, -52],
+        [34, -34],
+        [48, 12],
+        [18, 46],
+        [-36, 38]
+      ],
+      "fill_color": [0.28, 0.29, 0.33, 0.42]
+    },
+    {
+      "polygon_id": "small_basin",
+      "polygon": [
+        [46, 56],
+        [78, 46],
+        [86, 76],
+        [58, 94],
+        [34, 78]
+      ],
+      "fill_color": [0.3, 0.31, 0.35, 0.34]
+    }
+  ],
+  "collision": {
+    "type": "circle",
+    "radius": 130
+  },
+  "tags": ["background", "moon", "scenery"],
+  "provenance": {
+    "generator": "codex",
+    "model": "gpt-5-codex",
+    "prompt_file": "art/prompts/celestial-body.md",
+    "prompt_revision": "issue-50",
+    "created_at": "2026-08-23",
+    "seed": "manual-celestial-moon-01",
+    "manual_edits": "Hand-authored moon silhouette with subdued surface patches for issue 50.",
+    "source_license": "project-owned",
+    "notes": "Approved moon anchor near 260px across; low contrast to keep asteroid readability intact."
+  },
+  "approval": {
+    "status": "approved",
+    "reviewer": "codex"
+  }
+}

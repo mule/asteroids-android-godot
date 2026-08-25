@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="VectorAssetDefinition" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_definition.gd" id="1_vector_definition"]
+[ext_resource type="Script" path="res://scripts/resources/vector_asset_polygon.gd" id="2_vector_polygon"]
+[ext_resource type="Resource" path="res://assets/generated/materials/ship_lit_freighter.tres" id="3_ship_lit_freighter"]
+[ext_resource type="Resource" path="res://assets/generated/materials/thrust_emissive_freighter.tres" id="4_thrust_emissive_freighter"]
+
+[sub_resource type="Resource" id="Resource_thrust_flame"]
+script = ExtResource("2_vector_polygon")
+polygon_id = &"thrust_flame"
+polygon = PackedVector2Array(14, 90, 7, 124, 0, 102, -7, 124, -14, 90)
+fill_color = Color(1, 0.48, 0.14, 0.82)
+material_definition = ExtResource("4_thrust_emissive_freighter")
+visible_by_default = false
+
+[resource]
+script = ExtResource("1_vector_definition")
+asset_id = &"ship_freighter_01"
+category = 0
+primary_polygon = PackedVector2Array(0, -95, 44, -50, 60, 42, 36, 82, 18, 95, 0, 76, -18, 95, -36, 82, -60, 42, -44, -50)
+fill_color = Color(0.66, 0.72, 0.72, 1)
+material_definition = ExtResource("3_ship_lit_freighter")
+secondary_polygons = Array[Resource]([SubResource("Resource_thrust_flame")])
+use_collision_polygon = true
+collision_polygon = PackedVector2Array(0, -90, 54, -44, 58, 48, 20, 92, -20, 92, -58, 48, -54, -44)
+tags = PackedStringArray("class", "freighter", "ship")
+provenance_reference = "art/approved/ship_freighter_01.json"

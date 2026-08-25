@@ -78,6 +78,28 @@
       "source_sha256": "cfe1a2e3e529052107f5fcb83955d41c2c5b3ee6b2a5b863c286c5db54354188"
     },
     {
+      "asset_id": "celestial_moon_01",
+      "category": "celestial",
+      "material_ids": [
+        "celestial_lit_moon"
+      ],
+      "output_path": "assets/generated/celestial/celestial_moon_01.tres",
+      "schema_version": "vector-asset/v1",
+      "source_path": "art/approved/celestial_moon_01.json",
+      "source_sha256": "113d1b8fe65472795d6be955b4389dc513fe8a34a7851e2b9c1f2138ca48b45e"
+    },
+    {
+      "asset_id": "celestial_planet_01",
+      "category": "celestial",
+      "material_ids": [
+        "celestial_lit_planet"
+      ],
+      "output_path": "assets/generated/celestial/celestial_planet_01.tres",
+      "schema_version": "vector-asset/v1",
+      "source_path": "art/approved/celestial_planet_01.json",
+      "source_sha256": "b09e4691a4804095cd2b2dedb28f923e2962305ade7aa176eb09ef5f15cbb335"
+    },
+    {
       "asset_id": "ship_baseline_01",
       "category": "ship",
       "material_ids": [
@@ -100,6 +122,54 @@
       "schema_version": "vector-asset/v1",
       "source_path": "art/approved/ship_delta_01.json",
       "source_sha256": "3d8929355c50930247b284b8457dab415a2f80ea61d665bc87d8a8f9cda605ae"
+    },
+    {
+      "asset_id": "ship_freighter_01",
+      "category": "ship",
+      "material_ids": [
+        "ship_lit_freighter",
+        "thrust_emissive_freighter"
+      ],
+      "output_path": "assets/generated/ships/ship_freighter_01.tres",
+      "schema_version": "vector-asset/v1",
+      "source_path": "art/approved/ship_freighter_01.json",
+      "source_sha256": "c5f3a64e20ea7354c2bbc734680f53a310ba83a030749a4efe1e383f8dbf0a6e"
+    },
+    {
+      "asset_id": "ship_gunship_01",
+      "category": "ship",
+      "material_ids": [
+        "ship_lit_gunship",
+        "thrust_emissive_gunship"
+      ],
+      "output_path": "assets/generated/ships/ship_gunship_01.tres",
+      "schema_version": "vector-asset/v1",
+      "source_path": "art/approved/ship_gunship_01.json",
+      "source_sha256": "844d591eb758e89619e6a1fa017676e1c64584fa35a21074a566876f0ec39f6c"
+    },
+    {
+      "asset_id": "ship_interceptor_01",
+      "category": "ship",
+      "material_ids": [
+        "ship_lit_interceptor",
+        "thrust_emissive_interceptor"
+      ],
+      "output_path": "assets/generated/ships/ship_interceptor_01.tres",
+      "schema_version": "vector-asset/v1",
+      "source_path": "art/approved/ship_interceptor_01.json",
+      "source_sha256": "0d2f4aa2573c33260308c6ccee5cd29aabb2eb471867a6e12e8d5187e382c572"
+    },
+    {
+      "asset_id": "station_dock_01",
+      "category": "station",
+      "material_ids": [
+        "station_lit_dock",
+        "station_emissive_dock"
+      ],
+      "output_path": "assets/generated/stations/station_dock_01.tres",
+      "schema_version": "vector-asset/v1",
+      "source_path": "art/approved/station_dock_01.json",
+      "source_sha256": "df45b8422c21a320c3314c295585512765bb5a73806c9b70420291af673b24d1"
     }
   ],
   "materials": [
@@ -146,6 +216,18 @@
       "shader_mode": "emissive"
     },
     {
+      "material_id": "celestial_lit_moon",
+      "output_path": "assets/generated/materials/celestial_lit_moon.tres",
+      "owner_asset_id": "celestial_moon_01",
+      "shader_mode": "lit_vector"
+    },
+    {
+      "material_id": "celestial_lit_planet",
+      "output_path": "assets/generated/materials/celestial_lit_planet.tres",
+      "owner_asset_id": "celestial_planet_01",
+      "shader_mode": "lit_vector"
+    },
+    {
       "material_id": "ship_lit_baseline",
       "output_path": "assets/generated/materials/ship_lit_baseline.tres",
       "owner_asset_id": "ship_baseline_01",
@@ -158,6 +240,36 @@
       "shader_mode": "lit_vector"
     },
     {
+      "material_id": "ship_lit_freighter",
+      "output_path": "assets/generated/materials/ship_lit_freighter.tres",
+      "owner_asset_id": "ship_freighter_01",
+      "shader_mode": "lit_vector"
+    },
+    {
+      "material_id": "ship_lit_gunship",
+      "output_path": "assets/generated/materials/ship_lit_gunship.tres",
+      "owner_asset_id": "ship_gunship_01",
+      "shader_mode": "lit_vector"
+    },
+    {
+      "material_id": "ship_lit_interceptor",
+      "output_path": "assets/generated/materials/ship_lit_interceptor.tres",
+      "owner_asset_id": "ship_interceptor_01",
+      "shader_mode": "lit_vector"
+    },
+    {
+      "material_id": "station_emissive_dock",
+      "output_path": "assets/generated/materials/station_emissive_dock.tres",
+      "owner_asset_id": "station_dock_01",
+      "shader_mode": "emissive"
+    },
+    {
+      "material_id": "station_lit_dock",
+      "output_path": "assets/generated/materials/station_lit_dock.tres",
+      "owner_asset_id": "station_dock_01",
+      "shader_mode": "lit_vector"
+    },
+    {
       "material_id": "thrust_emissive_baseline",
       "output_path": "assets/generated/materials/thrust_emissive_baseline.tres",
       "owner_asset_id": "ship_baseline_01",
@@ -167,6 +279,24 @@
       "material_id": "thrust_emissive_delta",
       "output_path": "assets/generated/materials/thrust_emissive_delta.tres",
       "owner_asset_id": "ship_delta_01",
+      "shader_mode": "emissive"
+    },
+    {
+      "material_id": "thrust_emissive_freighter",
+      "output_path": "assets/generated/materials/thrust_emissive_freighter.tres",
+      "owner_asset_id": "ship_freighter_01",
+      "shader_mode": "emissive"
+    },
+    {
+      "material_id": "thrust_emissive_gunship",
+      "output_path": "assets/generated/materials/thrust_emissive_gunship.tres",
+      "owner_asset_id": "ship_gunship_01",
+      "shader_mode": "emissive"
+    },
+    {
+      "material_id": "thrust_emissive_interceptor",
+      "output_path": "assets/generated/materials/thrust_emissive_interceptor.tres",
+      "owner_asset_id": "ship_interceptor_01",
       "shader_mode": "emissive"
     }
   ],

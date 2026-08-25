@@ -28,6 +28,8 @@ Godot-ready resources under `assets/generated/`:
 - `assets/generated/ships/`
 - `assets/generated/asteroids/`
 - `assets/generated/bullets/`
+- `assets/generated/celestial/`
+- `assets/generated/stations/`
 - `assets/generated/materials/`
 - `assets/generated/manifest.json`
 

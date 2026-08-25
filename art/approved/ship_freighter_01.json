@@ -1,0 +1,75 @@
+{
+  "schema_version": "vector-asset/v1",
+  "asset_id": "ship_freighter_01",
+  "category": "ship",
+  "primary_polygon": [
+    [0, -95],
+    [44, -50],
+    [60, 42],
+    [36, 82],
+    [18, 95],
+    [0, 76],
+    [-18, 95],
+    [-36, 82],
+    [-60, 42],
+    [-44, -50]
+  ],
+  "fill_color": [0.66, 0.72, 0.72, 1.0],
+  "material": {
+    "material_id": "ship_lit_freighter",
+    "shader_mode": "lit_vector",
+    "ambient": 0.4,
+    "diffuse_strength": 0.54,
+    "highlight_strength": 0.12,
+    "light_band_count": 4
+  },
+  "secondary_polygons": [
+    {
+      "polygon_id": "thrust_flame",
+      "polygon": [
+        [14, 90],
+        [7, 124],
+        [0, 102],
+        [-7, 124],
+        [-14, 90]
+      ],
+      "fill_color": [1.0, 0.48, 0.14, 0.82],
+      "material": {
+        "material_id": "thrust_emissive_freighter",
+        "shader_mode": "emissive",
+        "emission_color": [1.0, 0.34, 0.08, 1.0],
+        "emission_intensity": 0.54
+      },
+      "visible_by_default": false
+    }
+  ],
+  "collision": {
+    "type": "convex_polygon",
+    "polygon": [
+      [0, -90],
+      [54, -44],
+      [58, 48],
+      [20, 92],
+      [-20, 92],
+      [-58, 48],
+      [-54, -44]
+    ]
+  },
+  "requires_symmetry": true,
+  "tags": ["class", "freighter", "ship"],
+  "provenance": {
+    "generator": "codex",
+    "model": "gpt-5-codex",
+    "prompt_file": "art/prompts/ship-classes.md",
+    "prompt_revision": "issue-50",
+    "created_at": "2026-08-23",
+    "seed": "manual-ship-freighter-01",
+    "manual_edits": "Hand-authored large cargo silhouette for issue 50.",
+    "source_license": "project-owned",
+    "notes": "Approved freighter anchor near 120x190px; broad cargo body stays simple for phone readability."
+  },
+  "approval": {
+    "status": "approved",
+    "reviewer": "codex"
+  }
+}

@@ -28,8 +28,14 @@ APPROVED_SOURCE_DIR = ROOT / "art" / "approved"
 DEFAULT_OUTPUT_DIR = ROOT / "assets" / "generated"
 MANIFEST_NAME = "manifest.json"
 BUILD_SCHEMA_VERSION = "vector-asset-build/v1"
-CATEGORY_ENUM = {"ship": 0, "asteroid": 1, "bullet": 2}
-CATEGORY_DIR = {"ship": "ships", "asteroid": "asteroids", "bullet": "bullets"}
+CATEGORY_ENUM = {"ship": 0, "asteroid": 1, "bullet": 2, "celestial": 6, "station": 7}
+CATEGORY_DIR = {
+    "ship": "ships",
+    "asteroid": "asteroids",
+    "bullet": "bullets",
+    "celestial": "celestial",
+    "station": "stations",
+}
 SHADER_MODE_ENUM = {"unlit": 0, "lit_vector": 1, "asteroid_faceted": 2, "emissive": 3}
 SHADER_PATH = {
     "unlit": "assets/shaders/emissive_unlit.gdshader",

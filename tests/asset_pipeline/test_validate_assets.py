@@ -8,6 +8,9 @@ import unittest
 from pathlib import Path
 
 from tools.asset_pipeline.validate_assets import (
+    CATEGORY_LIMITS,
+    COLLISION_RADIUS_LIMITS,
+    SUPPORTED_CATEGORIES,
     ValidationError,
     format_json,
     validate_asset,
@@ -22,6 +25,14 @@ VALIDATOR = ROOT / "tools" / "asset_pipeline" / "validate_assets.py"
 
 
 class VectorAssetValidationTests(unittest.TestCase):
+    def test_per_category_tables_cover_every_supported_category(self) -> None:
+        # Three hand-maintained tables key off the same category strings, and
+        # _normalize_collision indexes COLLISION_RADIUS_LIMITS directly. Adding
+        # a category to only two of them turns a would-be ValidationError into
+        # a raw KeyError traceback out of main(), so assert they stay in step.
+        self.assertEqual(set(CATEGORY_LIMITS), SUPPORTED_CATEGORIES)
+        self.assertEqual(set(COLLISION_RADIUS_LIMITS), SUPPORTED_CATEGORIES)
+
     def test_valid_ship_passes_and_normalizes_deterministically(self) -> None:
         path = FIXTURES / "valid_ship.json"
         first = validate_file(path).normalized
@@ -44,8 +55,14 @@ class VectorAssetValidationTests(unittest.TestCase):
                 "asteroid_iron_01",
                 "asteroid_shale_01",
                 "bullet_baseline_01",
+                "celestial_moon_01",
+                "celestial_planet_01",
                 "ship_baseline_01",
                 "ship_delta_01",
+                "ship_freighter_01",
+                "ship_gunship_01",
+                "ship_interceptor_01",
+                "station_dock_01",
             },
         )
 
@@ -109,8 +126,14 @@ class VectorAssetValidationTests(unittest.TestCase):
                     "asteroid_iron_01.json",
                     "asteroid_shale_01.json",
                     "bullet_baseline_01.json",
+                    "celestial_moon_01.json",
+                    "celestial_planet_01.json",
                     "ship_baseline_01.json",
                     "ship_delta_01.json",
+                    "ship_freighter_01.json",
+                    "ship_gunship_01.json",
+                    "ship_interceptor_01.json",
+                    "station_dock_01.json",
                 ],
             )
 

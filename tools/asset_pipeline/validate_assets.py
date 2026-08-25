@@ -15,7 +15,7 @@ from typing import Any, Iterable, Sequence
 
 
 SCHEMA_VERSION = "vector-asset/v1"
-SUPPORTED_CATEGORIES = {"ship", "asteroid", "bullet"}
+SUPPORTED_CATEGORIES = {"ship", "asteroid", "bullet", "celestial", "station"}
 SUPPORTED_SHADER_MODES = {"unlit", "lit_vector", "asteroid_faceted", "emissive"}
 ASSET_ID_RE = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*_[0-9]{2}$")
 TOKEN_RE = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
@@ -23,9 +23,18 @@ EDGE_TOLERANCE = 0.25
 CENTROID_LIMIT = 12.0
 SYMMETRY_TOLERANCE = 0.75
 CATEGORY_LIMITS = {
-    "ship": {"max_width": 96.0, "max_height": 128.0, "min_height": 16.0},
+    "ship": {"max_width": 128.0, "max_height": 200.0, "min_height": 16.0},
     "asteroid": {"max_width": 128.0, "max_height": 128.0, "min_height": 16.0},
     "bullet": {"max_width": 32.0, "max_height": 40.0, "min_height": 4.0},
+    "celestial": {"max_width": 420.0, "max_height": 420.0, "min_height": 120.0},
+    "station": {"max_width": 360.0, "max_height": 360.0, "min_height": 120.0},
+}
+COLLISION_RADIUS_LIMITS = {
+    "ship": 110.0,
+    "asteroid": 80.0,
+    "bullet": 24.0,
+    "celestial": 220.0,
+    "station": 190.0,
 }
 
 
@@ -97,7 +106,7 @@ def validate_asset(data: Any) -> dict[str, Any]:
     ]
 
     if "collision" in normalized:
-        normalized["collision"] = _normalize_collision(normalized["collision"])
+        normalized["collision"] = _normalize_collision(normalized["collision"], category)
 
     requires_symmetry = normalized.get("requires_symmetry", False)
     if not isinstance(requires_symmetry, bool):
@@ -264,7 +273,7 @@ def _normalize_material(data: Any, field: str) -> dict[str, Any]:
     return normalized
 
 
-def _normalize_collision(data: Any) -> dict[str, Any]:
+def _normalize_collision(data: Any, category: str) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValidationError("collision", "must be an object")
     collision_type = _require_string(data, "collision.type")
@@ -273,8 +282,9 @@ def _normalize_collision(data: Any) -> dict[str, Any]:
         radius = _number(data.get("radius"), "collision.radius")
         if radius <= 0:
             raise ValidationError("collision.radius", "must be greater than zero")
-        if radius > 80:
-            raise ValidationError("collision.radius", "must be 80 pixels or less")
+        max_radius = COLLISION_RADIUS_LIMITS[category]
+        if radius > max_radius:
+            raise ValidationError("collision.radius", f"must be {max_radius:g} pixels or less")
         return {"type": "circle", "radius": _stable_number(radius)}
 
     if collision_type == "convex_polygon":

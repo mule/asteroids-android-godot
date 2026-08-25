@@ -24,7 +24,7 @@
     },
     "category": {
       "type": "string",
-      "enum": ["ship", "asteroid", "bullet"]
+      "enum": ["ship", "asteroid", "bullet", "celestial", "station"]
     },
     "primary_polygon": {
       "$ref": "#/$defs/polygon"
