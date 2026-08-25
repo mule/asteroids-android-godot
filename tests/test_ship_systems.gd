@@ -40,7 +40,7 @@ func _init() -> void:
 	await _test_one_frame_of_asteroids_costs_one_hit(failures)
 	await _test_a_rock_resting_on_the_ship_costs_one_hit(failures)
 	await _test_a_hit_against_the_sector_wall_still_separates(failures)
-	await _test_clearing_a_wave_returns_some_fuel(failures)
+	await _test_clearing_a_field_returns_some_fuel(failures)
 	await _test_the_hud_shows_hull_fuel_credits_and_reserve(failures)
 
 	for failure in failures:
@@ -554,10 +554,12 @@ func _test_a_hit_against_the_sector_wall_still_separates(failures: Array[String]
 ## `max_fuel / fuel_burn_per_second` is 25 seconds of thrust for a whole run,
 ## and nothing in the game calls `refuel()`: `reset_systems()` runs only on a
 ## new game. Without a top-up, reserve thrust is not a setback but the terminal
-## state of every run -- quarter acceleration for the rest of it, against waves
-## that keep getting faster. A wave clear returns part of a tank, never all of
-## it: stations are #54's job and must stay worth flying to.
-func _test_clearing_a_wave_returns_some_fuel(failures: Array[String]) -> void:
+## state of every run -- quarter acceleration across an 8000x6000 sector. This
+## rode the wave clear until #48 replaced waves with seeded asteroid fields;
+## the per-field beat now carries it, so a run still earns fuel several times
+## instead of once. A field clear returns part of a tank, never all of it:
+## stations are #54's job and must stay worth flying to.
+func _test_clearing_a_field_returns_some_fuel(failures: Array[String]) -> void:
 	var game: Node = await _start_empty_game()
 	var systems: Node = game.ship_systems
 	var reserve_reports: Array[bool] = []
@@ -566,32 +568,32 @@ func _test_clearing_a_wave_returns_some_fuel(failures: Array[String]) -> void:
 		systems.consume_fuel(1.0)
 
 	if systems.fuel > 0.0:
-		failures.append("Wave refuel: the tank should start this test empty, holds %f" % systems.fuel)
+		failures.append("Field refuel: the tank should start this test empty, holds %f" % systems.fuel)
 
 	systems.reserve_thrust_changed.connect(func(active: bool) -> void: reserve_reports.append(active))
-	var wave_before: int = game.wave
-	game._check_wave_cleared()
+	# The handler ignores its argument -- it is the signal's payload, not an
+	# input to the refuel -- so the beat is driven directly rather than by
+	# emptying a real field, which `_start_empty_game` has already done.
+	game._on_asteroid_field_cleared(null)
 	await physics_frame
 
-	if game.wave <= wave_before:
-		failures.append("Wave refuel: an empty sector did not advance the wave")
 	if systems.fuel <= 0.0:
 		failures.append(
-			"Wave refuel: clearing a wave left the tank dry -- every run is locked on reserve"
+			"Field refuel: clearing a field left the tank dry -- every run is locked on reserve"
 		)
 	if systems.fuel > systems.max_fuel * 0.5:
 		# Deliberately a bound on the design rather than the exact constant:
-		# a wave clear is a top-up, so that docking at a station in #54 is still
+		# a field clear is a top-up, so that docking at a station in #54 is still
 		# the thing worth crossing the sector for. Tuning the amount is free;
 		# turning it into a full tank is the change this refuses.
 		failures.append(
-			"Wave refuel: a wave clear returned %f of a %f tank; stations (#54) must stay the"
+			"Field refuel: a field clear returned %f of a %f tank; stations (#54) must stay the"
 			% [systems.fuel, systems.max_fuel]
 			+ " primary refuel"
 		)
 	if reserve_reports != [false]:
 		failures.append(
-			"Wave refuel: reserve thrust should end when fuel returns, reported %s" % [reserve_reports]
+			"Field refuel: reserve thrust should end when fuel returns, reported %s" % [reserve_reports]
 		)
 
 	await _end_game_scene(game)
