@@ -25,6 +25,10 @@ signal undock_requested()
 
 var station: Node2D = null
 var systems: Node = null
+## Open, but stood down while something else owns the screen. Kept apart from
+## `station` so a resume puts the same panel back instead of needing a fresh
+## `show_for` -- see set_suspended().
+var suspended: bool = false
 
 
 func _ready() -> void:
@@ -38,19 +42,38 @@ func show_for(dock_station: Node2D, ship_systems: Node) -> void:
 	_release_systems()
 	station = dock_station
 	systems = ship_systems
+	suspended = false
 	_follow_systems()
-	root_control.visible = true
+	_update_visibility()
 	refresh()
 
 
 func hide_panel() -> void:
 	_release_systems()
 	station = null
-	root_control.visible = false
+	suspended = false
+	_update_visibility()
 
 
+## Stand the panel down without letting go of the station it is showing.
+##
+## The pause overlay owns the screen while the game is paused, and this panel
+## does not yield to it on its own: `Game.tscn` gives DockPanel a higher
+## `layer` than the Hud, so it draws over the overlay, and both run with
+## `process_mode` ALWAYS, so its buttons keep taking presses. Repairing a hull
+## while the game is paused is a change to run state that every other handler
+## in `game.gd` refuses to make. Hiding the panel answers both at once: a
+## hidden Control neither draws nor receives input.
+func set_suspended(value: bool) -> void:
+	suspended = value
+	_update_visibility()
+
+
+## Asked of the binding rather than of `root_control.visible`, so a suspended
+## panel still reports the dock it is holding. "Is the player docked" and "is
+## the panel on screen" stopped being the same question when pause arrived.
 func is_open() -> bool:
-	return root_control.visible
+	return station != null and is_instance_valid(station)
 
 
 func refresh() -> void:
@@ -69,11 +92,29 @@ func refresh() -> void:
 		roundi(systems.fuel), roundi(systems.max_fuel), _get_refuel_price()
 	]
 	credits_label.text = "Credits %d" % systems.credits
-	repair_button.disabled = systems.hull >= systems.max_hull
-	refuel_button.disabled = systems.fuel >= systems.max_fuel
+	# Disabled on what the purchase would actually deliver, not on the deficit
+	# alone. Prices are per whole point while hull and fuel are continuous, so
+	# a deficit under one point -- or one the balance cannot cover -- is an
+	# enabled button that does nothing when pressed.
+	repair_button.disabled = _get_affordable_repair() <= 0
+	refuel_button.disabled = _get_affordable_refuel() <= 0
 	# Never the undock button. A player with nothing left has to be able to
 	# fly away, so leaving is the one action that is never gated on anything.
 	undock_button.disabled = false
+
+
+func _get_affordable_repair() -> int:
+	if station == null or not is_instance_valid(station):
+		return 0
+
+	return station.get_affordable_repair_points(systems)
+
+
+func _get_affordable_refuel() -> int:
+	if station == null or not is_instance_valid(station):
+		return 0
+
+	return station.get_affordable_refuel_points(systems)
 
 
 func _get_repair_price() -> int:
@@ -93,6 +134,10 @@ func _follow_systems() -> void:
 	systems.hull_changed.connect(_on_hull_changed)
 	systems.fuel_changed.connect(_on_fuel_changed)
 	systems.credits_changed.connect(_on_credits_changed)
+
+
+func _update_visibility() -> void:
+	root_control.visible = is_open() and not suspended
 
 
 func _release_systems() -> void:

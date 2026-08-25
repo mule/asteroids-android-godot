@@ -19,8 +19,11 @@ const ASTEROID_SMALL := 2
 @export var station_collision_damage: float = 15.0
 ## Used only when the sector definition names no station count of its own.
 @export var station_count: int = 1
-## Keeps a station's dock zone off the sector wall, where the boundary push of
-## #46 would fight the ship trying to hold still inside it.
+## Floor for how far in from the sector wall a station may be placed. The
+## figure actually used is at least the boundary margin plus the dock zone
+## radius -- see _get_station_edge_inset(), which is what keeps the zone off
+## the wall where the boundary push of #46 would fight a ship trying to hold
+## still inside it.
 @export var station_edge_inset: float = 700.0
 ## Brief post-damage immunity. Inherited from the deleted respawn cycle so a
 ## single collision cannot chain into instant destruction: an asteroid resting
@@ -256,23 +259,54 @@ func _spawn_split_asteroids(size_tier: int, hit_position: Vector2, incoming_velo
 ## Stations are placed after the ship, so the player's own spawn can be handed
 ## to the sector as a point to keep clear of. A station centred on the spawn
 ## point would dock the player before the run had started.
+##
+## Built before they are placed, because how far a station has to stay from the
+## wall depends on how wide its own dock zone is, and that is a property of the
+## scene. Measured off the live shape rather than assumed here, for the same
+## reason `get_undock_position()` is.
 func _spawn_stations() -> void:
 	if station_scene == null:
 		return
 
+	var count := sector.get_station_count(station_count)
+	if count <= 0:
+		return
+
+	var stations: Array[Area2D] = []
+	for _index in count:
+		stations.append(_spawn_station())
+
 	var positions := sector.get_station_positions(
 		random,
-		sector.get_station_count(station_count),
-		station_edge_inset,
+		count,
+		_get_station_edge_inset(stations[0]),
 		-1.0,
 		[player_ship.global_position]
 	)
 
-	for spawn_position in positions:
-		_spawn_station(spawn_position)
+	for index in stations.size():
+		stations[index].global_position = positions[index]
 
 
-func _spawn_station(spawn_position: Vector2) -> Area2D:
+## Far enough in that the whole dock zone clears the boundary band, not just
+## the station at the centre of it.
+##
+## Inside that band the containment push of #46 accelerates the ship by up to
+## `acceleration * boundary_push_multiplier` -- 81 px/s² even at the band's
+## shallow inner edge, which takes a ship trying to hold still past
+## `dock_speed_limit` in under a second. A dock zone reaching into the band is
+## a dock zone whose outer half the player cannot arrive in. `station_edge_inset`
+## is the floor; the answer is whatever the live margin and the live zone radius
+## actually add up to, so retuning either cannot silently put the zone back in
+## the band.
+func _get_station_edge_inset(station: Area2D) -> float:
+	return maxf(
+		station_edge_inset,
+		sector.get_boundary_margin() + station.get_dock_zone_radius()
+	)
+
+
+func _spawn_station(spawn_position: Vector2 = Vector2.ZERO) -> Area2D:
 	var station := station_scene.instantiate() as Area2D
 	entities.add_child(station)
 	station.add_to_group("stations")
@@ -332,8 +366,12 @@ func _on_station_hull_entered(area: Area2D, station: Node) -> void:
 	_begin_damage_invulnerability()
 
 
+## Guarded on `paused` like every other handler here. The panel is hidden
+## while the game is paused, so a press cannot reach this -- but a purchase is
+## a change to run state, and the guard belongs on the handler rather than on
+## the fact that the button happens to be off screen.
 func _on_repair_requested() -> void:
-	if active_station == null or not is_instance_valid(active_station):
+	if paused or active_station == null or not is_instance_valid(active_station):
 		return
 
 	active_station.buy_repair(ship_systems)
@@ -341,16 +379,21 @@ func _on_repair_requested() -> void:
 
 
 func _on_refuel_requested() -> void:
-	if active_station == null or not is_instance_valid(active_station):
+	if paused or active_station == null or not is_instance_valid(active_station):
 		return
 
 	active_station.buy_refuel(ship_systems)
 	dock_panel.refresh()
 
 
-## Leaving is never gated on anything. A player with no credits, no fuel and a
-## wrecked hull still has to be able to fly away.
+## Leaving is never gated on the balance. A player with no credits, no fuel and
+## a wrecked hull still has to be able to fly away. The one thing it waits for
+## is the pause: flying is a thing a paused game does not do, and the panel is
+## off screen anyway while the pause overlay has it.
 func _on_undock_requested() -> void:
+	if paused:
+		return
+
 	_close_dock_panel()
 
 
@@ -446,6 +489,10 @@ func _pause_game() -> void:
 	paused = true
 	player_input.clear_touch_actions()
 	get_tree().paused = true
+	# The pause overlay owns the screen from here. The dock panel sits on a
+	# higher CanvasLayer than the Hud and runs with process_mode ALWAYS, so
+	# left alone it would draw over that overlay and keep taking presses.
+	dock_panel.set_suspended(true)
 	hud.show_paused()
 
 
@@ -455,6 +502,7 @@ func _resume_game() -> void:
 
 	paused = false
 	get_tree().paused = false
+	dock_panel.set_suspended(false)
 	hud.hide_status()
 
 

@@ -132,18 +132,43 @@ func get_hull_radius() -> float:
 	return _get_shape_radius(hull_shape)
 
 
-## Buy whole points of hull, as many as the balance covers, and charge for
-## exactly those. Returns the points bought, 0 when nothing was -- a ship with
-## no credits and a wrecked hull is a refused purchase, not an error.
-func buy_repair(systems: Node) -> int:
+## What a repair would actually deliver, without buying it.
+##
+## The panel asks this rather than comparing hull to max_hull itself. Those
+## two questions have different answers and the difference is reachable: hull
+## and fuel are continuous, the prices are per whole point, so a deficit under
+## one full point buys nothing -- and neither does any deficit a broke player
+## cannot pay for. A button offered on `hull < max_hull` alone is a button
+## that a player at 99.4 fuel, or at zero credits, can press all day for
+## nothing. One authority on what a purchase does, asked by both the button
+## and the purchase.
+func get_affordable_repair_points(systems: Node) -> int:
 	if systems == null or not is_instance_valid(systems):
 		return 0
 
-	var points := _affordable_points(
+	return _affordable_points(
 		systems.credits,
 		floori(systems.max_hull - systems.hull),
 		repair_cost_per_point
 	)
+
+
+func get_affordable_refuel_points(systems: Node) -> int:
+	if systems == null or not is_instance_valid(systems):
+		return 0
+
+	return _affordable_points(
+		systems.credits,
+		floori(systems.max_fuel - systems.fuel),
+		refuel_cost_per_point
+	)
+
+
+## Buy whole points of hull, as many as the balance covers, and charge for
+## exactly those. Returns the points bought, 0 when nothing was -- a ship with
+## no credits and a wrecked hull is a refused purchase, not an error.
+func buy_repair(systems: Node) -> int:
+	var points := get_affordable_repair_points(systems)
 
 	if points <= 0 or not systems.spend_credits(points * repair_cost_per_point):
 		return 0
@@ -153,14 +178,7 @@ func buy_repair(systems: Node) -> int:
 
 
 func buy_refuel(systems: Node) -> int:
-	if systems == null or not is_instance_valid(systems):
-		return 0
-
-	var points := _affordable_points(
-		systems.credits,
-		floori(systems.max_fuel - systems.fuel),
-		refuel_cost_per_point
-	)
+	var points := get_affordable_refuel_points(systems)
 
 	if points <= 0 or not systems.spend_credits(points * refuel_cost_per_point):
 		return 0

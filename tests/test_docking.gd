@@ -26,6 +26,9 @@ func _init() -> void:
 	await _test_the_dock_zone_alone_does_not_damage_the_ship(failures)
 	await _test_the_dock_panel_never_pauses_the_tree(failures)
 	await _test_pause_still_works_after_a_dock_panel_was_used(failures)
+	await _test_a_service_that_cannot_be_bought_is_not_offered(failures)
+	await _test_a_deficit_under_one_point_is_not_offered(failures)
+	await _test_pausing_stands_the_dock_panel_down(failures)
 	await _test_stations_are_placed_in_the_sector_clear_of_the_player(failures)
 
 	for failure in failures:
@@ -416,6 +419,115 @@ func _test_pause_still_works_after_a_dock_panel_was_used(failures: Array[String]
 	await _end_game_scene(game)
 
 
+## An enabled button that does nothing when pressed is worse than a disabled
+## one: it tells the player the service is available and then silently refuses.
+func _test_a_service_that_cannot_be_bought_is_not_offered(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var station: Area2D = await _add_station(game, Vector2(900.0, 0.0))
+	await _approach(game, station, station.dock_speed_limit * 0.5)
+
+	var systems: Node = game.ship_systems
+	var panel: CanvasLayer = game.dock_panel
+	systems.apply_damage(60.0)
+	for _step in 100:
+		systems.consume_fuel(1.0)
+	# Zero balance: every point of the deficit is unaffordable.
+	systems.spend_credits(systems.credits)
+	panel.refresh()
+
+	if not panel.repair_button.disabled:
+		failures.append("Prices: a broke ship was offered a repair it cannot pay for")
+	if not panel.refuel_button.disabled:
+		failures.append("Prices: a broke ship was offered a refuel it cannot pay for")
+	if panel.undock_button.disabled:
+		failures.append("Prices: leaving was gated on the balance")
+
+	# One point's worth, and only the repair becomes buyable at 2 cr a point.
+	systems.add_credits(station.repair_cost_per_point)
+	panel.refresh()
+	if panel.repair_button.disabled:
+		failures.append("Prices: a repair the balance covers was still refused by the button")
+
+	await _end_game_scene(game)
+
+
+## Fuel is continuous and prices are per whole point, so a nearly-full tank is
+## a deficit that no amount of credits can buy. The button has to agree.
+func _test_a_deficit_under_one_point_is_not_offered(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var station: Area2D = await _add_station(game, Vector2(900.0, 0.0))
+	await _approach(game, station, station.dock_speed_limit * 0.5)
+
+	var systems: Node = game.ship_systems
+	var panel: CanvasLayer = game.dock_panel
+	systems.add_credits(500)
+	# 0.6 of a point short: richly affordable, and still not one whole point.
+	systems.refuel(systems.max_fuel)
+	systems.consume_fuel(0.6 / systems.fuel_burn_per_second)
+	panel.refresh()
+
+	if systems.fuel >= systems.max_fuel:
+		failures.append("Prices: the test failed to leave a partial fuel deficit")
+	if not panel.refuel_button.disabled:
+		failures.append(
+			"Prices: a %f point deficit was offered as a refuel that buys nothing"
+			% (systems.max_fuel - systems.fuel)
+		)
+
+	var credits_before: int = systems.credits
+	panel.refuel_requested.emit()
+	if systems.credits != credits_before:
+		failures.append("Prices: a refuel that delivered no points still charged the player")
+
+	await _end_game_scene(game)
+
+
+## The pause overlay owns the screen while the game is paused. The dock panel
+## is a higher CanvasLayer than the Hud and runs with process_mode ALWAYS, so
+## without this it draws over that overlay and keeps taking button presses.
+func _test_pausing_stands_the_dock_panel_down(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var station: Area2D = await _add_station(game, Vector2(900.0, 0.0))
+	await _approach(game, station, station.dock_speed_limit * 0.5)
+
+	var systems: Node = game.ship_systems
+	var panel: CanvasLayer = game.dock_panel
+	systems.apply_damage(50.0)
+	systems.add_credits(500)
+
+	game._pause_game()
+	await physics_frame
+
+	if panel.root_control.visible:
+		failures.append("Pause: the dock panel kept drawing over the pause overlay")
+	if not panel.is_open():
+		failures.append("Pause: pausing let go of the dock the ship is still parked at")
+
+	var hull_before: float = systems.hull
+	var credits_before: int = systems.credits
+	panel.repair_requested.emit()
+	panel.refuel_requested.emit()
+	if systems.hull != hull_before or systems.credits != credits_before:
+		failures.append("Pause: a station service changed run state while the game was paused")
+
+	panel.undock_requested.emit()
+	await physics_frame
+	if station.docked_ship == null:
+		failures.append("Pause: the ship undocked while the game was paused")
+
+	game._resume_game()
+	await physics_frame
+
+	if not panel.root_control.visible:
+		failures.append("Pause: resuming did not put the dock panel back on screen")
+
+	panel.repair_requested.emit()
+	if systems.hull <= hull_before:
+		failures.append("Pause: the dock panel stayed dead after the game resumed")
+
+	await _end_game_scene(game)
+
+
 func _test_stations_are_placed_in_the_sector_clear_of_the_player(failures: Array[String]) -> void:
 	var game := (load(GAME_SCENE) as PackedScene).instantiate()
 	game.auto_start = false
@@ -427,6 +539,18 @@ func _test_stations_are_placed_in_the_sector_clear_of_the_player(failures: Array
 	var stations := get_nodes_in_group("stations")
 	if stations.is_empty():
 		failures.append("Placement: a new run placed no stations at all")
+	else:
+		# The invariant itself, not just the sample that happened to come out
+		# of it: a seeded draw only lands in the offending band occasionally,
+		# so asserting on the placement alone would pass by luck.
+		var probe: Node2D = stations[0]
+		var required: float = game.sector.get_boundary_margin() + probe.get_dock_zone_radius()
+		var used: float = game._get_station_edge_inset(probe)
+		if used < required:
+			failures.append(
+				"Placement: stations are inset %f px, but the dock zone only clears the %f px boundary band at %f"
+				% [used, game.sector.get_boundary_margin(), required]
+			)
 
 	var bounds: Rect2 = game.sector.get_bounds()
 	for station: Node2D in stations:
@@ -440,5 +564,21 @@ func _test_stations_are_placed_in_the_sector_clear_of_the_player(failures: Array
 			failures.append("Placement: a station spawned %f px from the player" % gap)
 		if station.is_in_group("gravity_sources"):
 			failures.append("Placement: a station joined gravity_sources without a gravity definition")
+
+		# The whole dock zone has to clear the boundary band, not just the
+		# station at the centre of it. Inside the band the containment push
+		# accelerates a ship that is trying to hold still, and a ship being
+		# accelerated is a ship over `dock_speed_limit`.
+		var margin: float = game.sector.get_boundary_margin()
+		var reach: float = margin + station.get_dock_zone_radius()
+		var wall_gap: float = minf(
+			minf(station.global_position.x - bounds.position.x, bounds.end.x - station.global_position.x),
+			minf(station.global_position.y - bounds.position.y, bounds.end.y - station.global_position.y)
+		)
+		if wall_gap < reach:
+			failures.append(
+				"Placement: a station %f px from the wall puts its dock zone inside the %f px boundary band"
+				% [wall_gap, margin]
+			)
 
 	await _end_game_scene(game)
