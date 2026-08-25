@@ -12,6 +12,24 @@ var _active_asteroids: int = 0
 var _cleared_emitted: bool = false
 
 
+## A field is the unit of activation, not the rock: one distance check per
+## field instead of one per rock, and the rocks a field owns are exactly the
+## subtree `Activation` puts to sleep with it. Registered here rather than by
+## `Sector.place_content()` so a field instanced anywhere -- including straight
+## from the scene in a test -- is activatable without the caller knowing to
+## enrol it.
+func _ready() -> void:
+	add_to_group(Activation.GROUP_ASTEROID_FIELDS)
+
+
+## The radius the field's rocks are scattered over, so `Activation` wakes the
+## field when its edge comes into range rather than when its centre does. A
+## 560-unit field woken on its centre would have rocks appearing well inside
+## the player's view.
+func get_activation_extent() -> float:
+	return maxf(0.0, field_radius)
+
+
 func seed_field(rng: RandomNumberGenerator, asteroid_scene: PackedScene, visual_assets: Array[Resource]) -> void:
 	_clear_seeded_asteroids()
 	_active_asteroids = 0

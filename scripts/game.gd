@@ -46,6 +46,13 @@ const ASTEROID_SMALL := 2
 ## fills.
 ## It refuels only: hull repair stays a station service, so damage still costs.
 @export var field_clear_refuel: float = 25.0
+## How far from the camera sector content keeps simulating. Half the 1152x648
+## base viewport's diagonal is ~661 units and the camera leads the ship by up
+## to FollowCamera.max_look_ahead (260), so 1200 keeps a full screen of margin
+## on every side: a field is awake and drifting well before the player can see
+## it, and nothing pops in at the edge of the view. Activation.SLEEP_SCALE
+## widens this by 15% again before anything is put back to sleep.
+@export var activation_radius: float = 1200.0
 @export var random_seed: int = 1729
 @export var world_light_direction: Vector2 = Vector2(-0.55, -0.83)
 @export var shader_lighting_enabled: bool = true
@@ -74,6 +81,10 @@ var invulnerability_token: int = 0
 ## dock panel shows one station's prices and `_on_undock_requested` has to know
 ## whose dock it is releasing.
 var active_station: Node = null
+## Fields left simulating by the last activation pass. Read by the tests as the
+## frame-budget measurable -- it is the number that a later issue adding
+## content to the sector must not quietly grow.
+var active_field_count: int = 0
 
 
 func _ready() -> void:
@@ -105,6 +116,23 @@ func _ready() -> void:
 	_build_star_layers()
 	if auto_start:
 		_start_new_game()
+
+
+## Driven from the camera, not the ship. The camera leads the ship by its
+## look-ahead, so at speed it is already most of a screen ahead of the hull;
+## activating around the ship would leave the fields the player is flying into
+## asleep until they were on top of them, which is the pop-in this issue
+## exists to avoid. The camera is what the player can see, so the camera is
+## what decides what has to be simulated.
+func _physics_process(_delta: float) -> void:
+	if not play_active or paused:
+		return
+
+	active_field_count = Activation.update_group(
+		Activation.GROUP_ASTEROID_FIELDS,
+		follow_camera.global_position,
+		activation_radius
+	)
 
 
 func _unhandled_input(event: InputEvent) -> void:
