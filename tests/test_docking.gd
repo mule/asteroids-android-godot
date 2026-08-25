@@ -1,0 +1,444 @@
+## Docking, station services, and the two ways a station touches a ship.
+##
+## A station is the only thing in the sector that is both an obstacle and a
+## destination, so almost every test here is about keeping those two apart:
+## the hull damages, the dock zone docks, and nothing may confuse them.
+extends SceneTree
+
+
+const GAME_SCENE := "res://scenes/game/Game.tscn"
+const STATION_SCENE := "res://scenes/entities/SpaceStation.tscn"
+
+
+func _init() -> void:
+	var failures: Array[String] = []
+
+	await _test_a_slow_approach_docks(failures)
+	await _test_a_fast_approach_does_not_dock(failures)
+	await _test_docking_zeroes_velocity_and_disables_controls(failures)
+	await _test_repair_costs_credits_and_raises_hull(failures)
+	await _test_repair_fails_cleanly_without_credits(failures)
+	await _test_refuel_costs_credits_and_fills_the_tank(failures)
+	await _test_refuel_fails_cleanly_without_credits(failures)
+	await _test_undocking_restores_control_and_does_not_redock(failures)
+	await _test_undocking_is_never_gated_on_payment(failures)
+	await _test_the_station_hull_damages_the_ship(failures)
+	await _test_the_dock_zone_alone_does_not_damage_the_ship(failures)
+	await _test_the_dock_panel_never_pauses_the_tree(failures)
+	await _test_pause_still_works_after_a_dock_panel_was_used(failures)
+	await _test_stations_are_placed_in_the_sector_clear_of_the_player(failures)
+
+	for failure in failures:
+		printerr("FAIL: ", failure)
+
+	if failures.is_empty():
+		print("ALL DOCKING TESTS PASSED SUCCESSFULLY!")
+		quit(0)
+	else:
+		printerr("FAILED %d TESTS" % failures.size())
+		quit(1)
+
+
+## A started game holding nothing the test did not put there: no asteroids to
+## collide with the ship mid-test, and no randomly placed stations competing
+## with the one each test positions itself.
+func _start_empty_game() -> Node:
+	var game := (load(GAME_SCENE) as PackedScene).instantiate()
+	# Before add_child: _ready() runs inside add_child, so setting it after has
+	# already let a throwaway run fill the sector -- same ordering the star
+	# layer and ship systems suites document.
+	game.auto_start = false
+	root.add_child(game)
+	await physics_frame
+	game._start_new_game()
+	await physics_frame
+
+	for asteroid in get_nodes_in_group("asteroids"):
+		asteroid.free()
+	for station in get_nodes_in_group("stations"):
+		station.free()
+	await physics_frame
+	return game
+
+
+func _end_game_scene(game: Node) -> void:
+	root.remove_child(game)
+	game.free()
+	await physics_frame
+
+
+## One station, at a known offset from the player, wired exactly the way
+## `game.gd` wires the ones it places itself.
+func _add_station(game: Node, offset: Vector2) -> Area2D:
+	var station: Area2D = game._spawn_station(game.player_ship.global_position + offset)
+	await physics_frame
+	return station
+
+
+## Put the ship inside the dock zone at `speed`, travelling at the station.
+func _approach(game: Node, station: Area2D, speed: float) -> void:
+	var ship: Area2D = game.player_ship
+	var direction := (station.global_position - ship.global_position).normalized()
+	if direction == Vector2.ZERO:
+		direction = Vector2.RIGHT
+	ship.global_position = station.global_position - direction * (station.get_dock_zone_radius() - 8.0)
+	ship.velocity = direction * speed
+	await physics_frame
+	await physics_frame
+
+
+func _test_a_slow_approach_docks(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var station: Area2D = await _add_station(game, Vector2(900.0, 0.0))
+
+	await _approach(game, station, station.dock_speed_limit * 0.5)
+
+	if station.docked_ship != game.player_ship:
+		failures.append("Dock: a ship drifting in under the speed limit did not dock")
+	if not game.player_ship.is_docked():
+		failures.append("Dock: the station docked a ship that does not think it is docked")
+	if not game.dock_panel.is_open():
+		failures.append("Dock: docking did not open the dock panel")
+
+	await _end_game_scene(game)
+
+
+## Ramming a station at full speed must not be the same input as docking.
+func _test_a_fast_approach_does_not_dock(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var station: Area2D = await _add_station(game, Vector2(900.0, 0.0))
+
+	await _approach(game, station, station.dock_speed_limit * 4.0)
+
+	if station.docked_ship != null:
+		failures.append(
+			"Dock speed: a ship crossing the zone at %f px/s docked, the limit is %f"
+			% [station.dock_speed_limit * 4.0, station.dock_speed_limit]
+		)
+	if game.player_ship.is_docked():
+		failures.append("Dock speed: a ship above the speed limit reports itself docked")
+	if game.dock_panel.is_open():
+		failures.append("Dock speed: ramming a station opened the dock panel")
+
+	await _end_game_scene(game)
+
+
+func _test_docking_zeroes_velocity_and_disables_controls(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var station: Area2D = await _add_station(game, Vector2(900.0, 0.0))
+
+	await _approach(game, station, station.dock_speed_limit * 0.5)
+	var docked_position: Vector2 = game.player_ship.global_position
+
+	for _step in 10:
+		await physics_frame
+
+	if game.player_ship.velocity.length() > 0.0:
+		failures.append(
+			"Dock hold: a docked ship still carries %f px/s" % game.player_ship.velocity.length()
+		)
+	if game.player_ship.controls_enabled:
+		failures.append("Dock hold: a docked ship still answers the controls")
+	if not game.player_ship.global_position.is_equal_approx(docked_position):
+		failures.append(
+			"Dock hold: a docked ship drifted %f px"
+			% game.player_ship.global_position.distance_to(docked_position)
+		)
+
+	await _end_game_scene(game)
+
+
+func _test_repair_costs_credits_and_raises_hull(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var station: Area2D = await _add_station(game, Vector2(900.0, 0.0))
+	var systems: Node = game.ship_systems
+	await _approach(game, station, station.dock_speed_limit * 0.5)
+
+	systems.apply_damage(30.0)
+	systems.add_credits(20)
+	var bought: int = station.buy_repair(systems)
+
+	if bought <= 0:
+		failures.append("Repair: a damaged ship with 20 credits bought no repair")
+	if not is_equal_approx(systems.hull, 70.0 + float(bought)):
+		failures.append(
+			"Repair: bought %d points but the hull went from 70 to %f" % [bought, systems.hull]
+		)
+	if systems.credits != 20 - bought * station.repair_cost_per_point:
+		failures.append(
+			"Repair: %d points at %d credits each left a balance of %d"
+			% [bought, station.repair_cost_per_point, systems.credits]
+		)
+
+	# Clamped at the maximum: a full hull is never worth paying for.
+	systems.add_credits(500)
+	var before: int = systems.credits
+	station.buy_repair(systems)
+	if systems.hull > systems.max_hull:
+		failures.append("Repair: the hull passed its maximum at %f" % systems.hull)
+	if systems.hull < systems.max_hull:
+		failures.append("Repair: 500 credits did not fill a %f hull" % systems.max_hull)
+	var spare: int = systems.credits
+	station.buy_repair(systems)
+	if systems.credits != spare:
+		failures.append("Repair: repairing a full hull charged %d credits" % (spare - systems.credits))
+	if before <= spare:
+		failures.append("Repair: filling the hull was free")
+
+	await _end_game_scene(game)
+
+
+func _test_repair_fails_cleanly_without_credits(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var station: Area2D = await _add_station(game, Vector2(900.0, 0.0))
+	var systems: Node = game.ship_systems
+	await _approach(game, station, station.dock_speed_limit * 0.5)
+
+	systems.apply_damage(40.0)
+	var hull_before: float = systems.hull
+	var bought: int = station.buy_repair(systems)
+
+	if bought != 0:
+		failures.append("Repair: a broke ship bought %d points of hull" % bought)
+	if not is_equal_approx(systems.hull, hull_before):
+		failures.append("Repair: a refused purchase moved the hull to %f" % systems.hull)
+	if systems.credits != 0:
+		failures.append("Repair: a refused purchase left the balance at %d" % systems.credits)
+
+	await _end_game_scene(game)
+
+
+func _test_refuel_costs_credits_and_fills_the_tank(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var station: Area2D = await _add_station(game, Vector2(900.0, 0.0))
+	var systems: Node = game.ship_systems
+	await _approach(game, station, station.dock_speed_limit * 0.5)
+
+	for _step in 100:
+		systems.consume_fuel(1.0)
+	systems.add_credits(15)
+	var bought: int = station.buy_refuel(systems)
+
+	if bought <= 0:
+		failures.append("Refuel: a dry ship with 15 credits bought no fuel")
+	if not is_equal_approx(systems.fuel, float(bought)):
+		failures.append("Refuel: bought %d points but the tank holds %f" % [bought, systems.fuel])
+	if systems.credits != 15 - bought * station.refuel_cost_per_point:
+		failures.append("Refuel: the balance is %d after buying %d points" % [systems.credits, bought])
+
+	systems.add_credits(500)
+	station.buy_refuel(systems)
+	if systems.fuel > systems.max_fuel:
+		failures.append("Refuel: the tank passed its maximum at %f" % systems.fuel)
+	if systems.fuel < systems.max_fuel:
+		failures.append("Refuel: 500 credits did not fill a %f tank" % systems.max_fuel)
+
+	await _end_game_scene(game)
+
+
+func _test_refuel_fails_cleanly_without_credits(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var station: Area2D = await _add_station(game, Vector2(900.0, 0.0))
+	var systems: Node = game.ship_systems
+	await _approach(game, station, station.dock_speed_limit * 0.5)
+
+	for _step in 100:
+		systems.consume_fuel(1.0)
+	var bought: int = station.buy_refuel(systems)
+
+	if bought != 0:
+		failures.append("Refuel: a broke ship bought %d points of fuel" % bought)
+	if systems.fuel > 0.0:
+		failures.append("Refuel: a refused purchase put %f fuel in the tank" % systems.fuel)
+
+	await _end_game_scene(game)
+
+
+## An undock position inside the trigger area is an inescapable dock loop: the
+## zone re-reports the overlap, the ship is stationary and so always under the
+## speed limit, and it docks again on the next frame forever.
+func _test_undocking_restores_control_and_does_not_redock(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var station: Area2D = await _add_station(game, Vector2(900.0, 0.0))
+	await _approach(game, station, station.dock_speed_limit * 0.5)
+
+	if station.docked_ship == null:
+		failures.append("Undock: the ship never docked, so undocking was not tested")
+		await _end_game_scene(game)
+		return
+
+	var ship: Area2D = game.player_ship
+	station.undock(ship)
+	await physics_frame
+
+	var distance: float = ship.global_position.distance_to(station.global_position)
+	var clearance: float = station.get_dock_zone_radius() + ship.get_collision_radius()
+	if distance <= clearance:
+		failures.append(
+			"Undock: released %f px from the station, inside the %f px dock zone plus hull"
+			% [distance, clearance]
+		)
+
+	for _step in 10:
+		await physics_frame
+		if station.docked_ship != null:
+			failures.append("Undock: the ship re-docked on its own after being released")
+			break
+
+	if not ship.controls_enabled:
+		failures.append("Undock: the released ship still does not answer the controls")
+	if ship.is_docked():
+		failures.append("Undock: the released ship still reports itself docked")
+	if game.dock_panel.is_open():
+		failures.append("Undock: the dock panel is still open after undocking")
+
+	await _end_game_scene(game)
+
+
+## A player with nothing left has to be able to leave.
+func _test_undocking_is_never_gated_on_payment(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var station: Area2D = await _add_station(game, Vector2(900.0, 0.0))
+	await _approach(game, station, station.dock_speed_limit * 0.5)
+
+	game.ship_systems.apply_damage(50.0)
+	for _step in 100:
+		game.ship_systems.consume_fuel(1.0)
+
+	game.dock_panel.undock_requested.emit()
+	await physics_frame
+
+	if station.docked_ship != null:
+		failures.append("Undock: a broke, damaged, dry ship was held at the station")
+	if not game.player_ship.controls_enabled:
+		failures.append("Undock: a broke ship was released without its controls")
+
+	await _end_game_scene(game)
+
+
+func _test_the_station_hull_damages_the_ship(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var station: Area2D = await _add_station(game, Vector2(900.0, 0.0))
+	var systems: Node = game.ship_systems
+	var ship: Area2D = game.player_ship
+	ship.set_invulnerable(false)
+	await physics_frame
+
+	# Rammed, not drifted. A ship slow enough to dock never reaches the hull:
+	# the dock zone is far wider than it is, so the only way to touch the
+	# station is to cross that zone too fast to be docked by it.
+	var hull_before: float = systems.hull
+	ship.velocity = Vector2.RIGHT * station.dock_speed_limit * 4.0
+	ship.global_position = station.global_position
+	for _step in 5:
+		await physics_frame
+
+	if systems.hull >= hull_before:
+		failures.append("Station hull: flying into the station did not damage the ship")
+	if station.docked_ship != null:
+		failures.append("Station hull: hitting the hull docked the ship instead of hurting it")
+
+	# The pair must end up apart. A ship left sitting inside the hull is billed
+	# again every time the post-damage window closes, and a dry ship on quarter
+	# thrust cannot fly out of it -- the defect test_ship_systems.gd documents
+	# for a rock resting on the ship.
+	if station.get_overlapping_areas().has(ship):
+		failures.append(
+			"Station hull: the ship is still inside the station hull %f px from its centre"
+			% ship.global_position.distance_to(station.global_position)
+		)
+
+	await _end_game_scene(game)
+
+
+func _test_the_dock_zone_alone_does_not_damage_the_ship(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var station: Area2D = await _add_station(game, Vector2(900.0, 0.0))
+	var systems: Node = game.ship_systems
+	game.player_ship.set_invulnerable(false)
+	await physics_frame
+
+	var hull_before: float = systems.hull
+	await _approach(game, station, station.dock_speed_limit * 0.5)
+	for _step in 10:
+		await physics_frame
+
+	if systems.hull < hull_before:
+		failures.append(
+			"Dock zone: docking cost %f hull -- the zone must not damage" % (hull_before - systems.hull)
+		)
+
+	await _end_game_scene(game)
+
+
+## `get_tree().paused` belongs to the pause feature. Game.tscn's process_mode
+## values are configured around it, so a dock panel that borrowed it would
+## freeze exactly the nodes the pause overlay expects to keep running.
+func _test_the_dock_panel_never_pauses_the_tree(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var station: Area2D = await _add_station(game, Vector2(900.0, 0.0))
+
+	await _approach(game, station, station.dock_speed_limit * 0.5)
+
+	if paused:
+		failures.append("Dock pause: opening the dock panel paused the scene tree")
+	if game.paused:
+		failures.append("Dock pause: opening the dock panel put the game in its paused state")
+
+	await _end_game_scene(game)
+
+
+func _test_pause_still_works_after_a_dock_panel_was_used(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var station: Area2D = await _add_station(game, Vector2(900.0, 0.0))
+
+	await _approach(game, station, station.dock_speed_limit * 0.5)
+	game.dock_panel.undock_requested.emit()
+	await physics_frame
+
+	game._pause_game()
+	await physics_frame
+
+	if not game.paused or not paused:
+		failures.append(
+			"Pause: after a dock panel opened and closed, pausing left game.paused=%s tree.paused=%s"
+			% [game.paused, paused]
+		)
+
+	game._resume_game()
+	await physics_frame
+
+	if game.paused or paused:
+		failures.append("Pause: resuming after a dock left the game paused")
+	if not game.player_ship.controls_enabled:
+		failures.append("Pause: the ship lost its controls across a dock and a pause")
+
+	await _end_game_scene(game)
+
+
+func _test_stations_are_placed_in_the_sector_clear_of_the_player(failures: Array[String]) -> void:
+	var game := (load(GAME_SCENE) as PackedScene).instantiate()
+	game.auto_start = false
+	root.add_child(game)
+	await physics_frame
+	game._start_new_game()
+	await physics_frame
+
+	var stations := get_nodes_in_group("stations")
+	if stations.is_empty():
+		failures.append("Placement: a new run placed no stations at all")
+
+	var bounds: Rect2 = game.sector.get_bounds()
+	for station: Node2D in stations:
+		if not bounds.has_point(station.global_position):
+			failures.append(
+				"Placement: a station at %s sits outside the sector %s"
+				% [station.global_position, bounds]
+			)
+		var gap: float = station.global_position.distance_to(game.player_ship.global_position)
+		if gap < station.get_dock_zone_radius():
+			failures.append("Placement: a station spawned %f px from the player" % gap)
+		if station.is_in_group("gravity_sources"):
+			failures.append("Placement: a station joined gravity_sources without a gravity definition")
+
+	await _end_game_scene(game)

@@ -8,6 +8,10 @@ const ASTEROID_FIELD_SCENE := preload("res://scenes/world/AsteroidField.tscn")
 
 @export var definition: Resource
 
+## Rejection-sampling budget for landmark placement. See
+## get_station_positions() for what happens when it runs out.
+const _PLACEMENT_ATTEMPTS := 48
+
 var _fields: Array[Node2D] = []
 
 
@@ -165,3 +169,82 @@ func _clear_fields() -> void:
 			parent.remove_child(field)
 		field.queue_free()
 	_fields.clear()
+
+## How many stations this sector wants. Asked of the Sector for the same reason
+## as get_seed() and get_sector_name(): the caller owns the default it would
+## have used, the sector owns the answer when it has one.
+func get_station_count(fallback: int) -> int:
+	if definition != null and "station_count" in definition:
+		return maxi(0, definition.station_count)
+
+	return fallback
+
+
+func get_min_landmark_separation(fallback: float) -> float:
+	if definition != null and "min_landmark_separation" in definition:
+		return definition.min_landmark_separation
+
+	return fallback
+
+
+## Where this sector's stations sit.
+##
+## Rejection sampling against everything already placed and against `avoid` --
+## the player's own spawn, in practice. Two stations on top of each other put
+## one ship inside two dock zones and hand the dock to whichever polled first,
+## and a station on the spawn point docks the player before the run starts.
+##
+## Best effort, not a guarantee: after `_PLACEMENT_ATTEMPTS` tries the furthest
+## candidate seen is taken. A sector too small to separate the stations it asks
+## for must still produce them -- silently returning fewer would leave the
+## sector with no destination at all, which is worse than a crowded one.
+func get_station_positions(
+	rng: RandomNumberGenerator,
+	count: int,
+	edge_inset: float = 0.0,
+	min_separation: float = -1.0,
+	avoid: Array = []
+) -> Array[Vector2]:
+	var separation := get_min_landmark_separation(0.0) if min_separation < 0.0 else min_separation
+	var placed: Array[Vector2] = []
+
+	for _index in maxi(0, count):
+		placed.append(_pick_separated_position(rng, placed, avoid, separation, edge_inset))
+
+	return placed
+
+
+func _pick_separated_position(
+	rng: RandomNumberGenerator,
+	placed: Array[Vector2],
+	avoid: Array,
+	separation: float,
+	edge_inset: float
+) -> Vector2:
+	var best := Vector2.ZERO
+	var best_gap := -1.0
+
+	for _attempt in _PLACEMENT_ATTEMPTS:
+		var candidate := get_random_position(rng, edge_inset)
+		var gap := _get_nearest_gap(candidate, placed, avoid)
+
+		if gap >= separation:
+			return candidate
+
+		if gap > best_gap:
+			best_gap = gap
+			best = candidate
+
+	return best
+
+
+func _get_nearest_gap(candidate: Vector2, placed: Array[Vector2], avoid: Array) -> float:
+	var gap := INF
+
+	for other: Vector2 in placed:
+		gap = minf(gap, candidate.distance_to(other))
+
+	for other: Vector2 in avoid:
+		gap = minf(gap, candidate.distance_to(other))
+
+	return gap
