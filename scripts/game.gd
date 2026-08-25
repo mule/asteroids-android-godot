@@ -9,8 +9,6 @@ const ASTEROID_SMALL := 2
 @export var bullet_scene: PackedScene
 @export var starting_score: int = 0
 @export var starting_wave: int = 1
-@export var initial_asteroid_count: int = 4
-@export var spawn_safe_radius: float = 180.0
 @export var split_child_count: int = 2
 @export var asteroid_collision_damage: float = 25.0
 ## Brief post-damage immunity. Inherited from the deleted respawn cycle so a
@@ -21,17 +19,19 @@ const ASTEROID_SMALL := 2
 ## window above only stops the hit being counted; this is what stops the pair
 ## touching, so it has to clear the ship's radius well inside one window.
 @export var asteroid_deflect_speed: float = 140.0
-## Fuel returned for clearing a wave -- a quarter tank, 6.25 seconds of thrust,
-## deliberately less than a wave of steady thrusting costs.
+## Fuel returned for clearing one asteroid field -- a quarter tank, 6.25 seconds
+## of thrust, deliberately less than crossing the sector to the next field costs.
 ##
 ## Interim measure until the stations of #54, which are meant to be the primary
 ## refuel and must not be made pointless here. Nothing else in the game refuels:
 ## a 100-unit tank at 4/s is 25 seconds of thrust for an entire run, after which
-## every remaining wave is flown at quarter acceleration with no counterplay.
-## This tops the tank up on a beat the player already earns, and it is scoped to
-## the wave loop, which #57 deletes -- so it cannot outlive the gap it fills.
+## the rest of the sector is flown at quarter acceleration with no counterplay.
+## This tops the tank up on a beat the player already earns. It rode the wave
+## loop until #48 deleted that loop; it now rides the field-clear signal, which
+## #57's threat director supersedes -- so it still cannot outlive the gap it
+## fills.
 ## It refuels only: hull repair stays a station service, so damage still costs.
-@export var wave_clear_refuel: float = 25.0
+@export var field_clear_refuel: float = 25.0
 @export var random_seed: int = 1729
 @export var world_light_direction: Vector2 = Vector2(-0.55, -0.83)
 @export var shader_lighting_enabled: bool = true
@@ -112,7 +112,7 @@ func _start_new_game() -> void:
 	hud.set_pause_available(true)
 	_update_hud()
 	_spawn_player()
-	_spawn_wave()
+	_place_sector_content()
 	feedback.spawn_wave_flash()
 
 
@@ -180,15 +180,6 @@ func _deflect_asteroid_from_player(asteroid: Area2D) -> void:
 	)
 
 
-func _spawn_wave() -> void:
-	var asteroid_count: int = initial_asteroid_count + maxi(0, wave - starting_wave)
-
-	for index in asteroid_count:
-		var spawn_position := _get_safe_spawn_position(index, asteroid_count)
-		var velocity := _get_random_asteroid_velocity(ASTEROID_LARGE)
-		_spawn_asteroid(ASTEROID_LARGE, spawn_position, velocity)
-
-
 func _spawn_asteroid(size_tier: int, spawn_position: Vector2, velocity: Vector2) -> Area2D:
 	var asteroid := asteroid_scene.instantiate() as Area2D
 	var visual_asset := _get_random_asteroid_visual_asset()
@@ -226,7 +217,7 @@ func _on_asteroid_destroyed(
 		var next_size := size_tier + 1
 		call_deferred("_spawn_split_asteroids", next_size, hit_position, incoming_velocity)
 
-	call_deferred("_check_wave_cleared")
+	call_deferred("_check_asteroid_fields_cleared")
 
 
 func _spawn_split_asteroids(size_tier: int, hit_position: Vector2, incoming_velocity: Vector2) -> void:
@@ -270,16 +261,11 @@ func _end_game() -> void:
 	hud.show_game_over(score, wave)
 
 
-func _check_wave_cleared() -> void:
+func _check_asteroid_fields_cleared() -> void:
 	if not play_active or paused or _get_active_asteroid_count() > 0:
 		return
 
-	wave += 1
-	# Partial, on a beat the player earns. See `wave_clear_refuel`.
-	ship_systems.refuel(wave_clear_refuel)
-	_update_hud()
 	_clear_bullets()
-	_spawn_wave()
 	feedback.spawn_wave_flash()
 
 
@@ -338,6 +324,10 @@ func _apply_lighting_to_entities() -> void:
 	for entity in entities.get_children():
 		_apply_lighting_to_entity(entity)
 
+	for field in sector.get_fields():
+		for asteroid in field.get_children():
+			_apply_lighting_to_entity(asteroid)
+
 
 func _apply_lighting_to_entity(entity: Node) -> void:
 	if entity == null:
@@ -365,6 +355,10 @@ func _apply_sector_bounds() -> void:
 func _apply_sector_bounds_to_entities() -> void:
 	for entity in entities.get_children():
 		_apply_sector_bounds_to_entity(entity)
+
+	for field in sector.get_fields():
+		for asteroid in field.get_children():
+			_apply_sector_bounds_to_entity(asteroid)
 
 
 func _apply_sector_bounds_to_entity(entity: Node) -> void:
@@ -397,20 +391,40 @@ func _build_star_layer(layer: StarLayer, bounds: Rect2, sector_seed: int) -> voi
 	layer.build_stars(span, sector_seed + layer.layer_seed)
 
 
+func _place_sector_content() -> void:
+	random.seed = sector.get_seed(random_seed)
+	sector.place_content(random)
+
+	for field in sector.get_fields():
+		if field.has_signal("field_cleared"):
+			field.connect("field_cleared", _on_asteroid_field_cleared)
+		if field.has_method("seed_field"):
+			field.seed_field(random, asteroid_scene, asteroid_visual_assets)
+		_wire_field_asteroids(field)
+
+
+func _wire_field_asteroids(field: Node2D) -> void:
+	for child in field.get_children():
+		if not child is Area2D or not child.is_in_group("asteroids"):
+			continue
+
+		var asteroid := child as Area2D
+		_apply_lighting_to_entity(asteroid)
+
+		if asteroid.has_signal("destroyed"):
+			var callback := Callable(self, "_on_asteroid_destroyed")
+			if not asteroid.is_connected("destroyed", callback):
+				asteroid.connect("destroyed", callback)
+
+
+func _on_asteroid_field_cleared(field: Node2D) -> void:
+	# Partial, on a beat the player earns. See `field_clear_refuel`.
+	ship_systems.refuel(field_clear_refuel)
+	call_deferred("_check_asteroid_fields_cleared")
+
+
 func _on_hud_touch_action_changed(action: StringName, pressed: bool) -> void:
 	player_input.set_touch_action(action, pressed)
-
-
-func _get_safe_spawn_position(index: int, asteroid_count: int) -> Vector2:
-	for attempt in 32:
-		var spawn_position := sector.get_random_position(random)
-
-		if spawn_position.distance_to(player_ship.global_position) >= spawn_safe_radius:
-			return spawn_position
-
-	var fallback_angle := TAU * float(index) / maxf(1.0, float(asteroid_count))
-	var fallback_radius := spawn_safe_radius + 80.0
-	return player_ship.global_position + Vector2.RIGHT.rotated(fallback_angle) * fallback_radius
 
 
 func _get_random_asteroid_velocity(size_tier: int) -> Vector2:

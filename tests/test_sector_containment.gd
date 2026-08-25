@@ -35,6 +35,7 @@ func _init() -> void:
 	await _test_the_shipped_game_wires_the_margin_and_the_hud(failures)
 	await _test_a_ship_pinned_on_the_wall_reports_no_outward_speed(failures)
 	await _test_a_rock_crushed_against_the_wall_never_points_outward(failures)
+	await _test_a_rock_parented_off_the_origin_is_contained_in_world_space(failures)
 
 	for failure in failures:
 		printerr("FAIL: ", failure)
@@ -333,4 +334,43 @@ func _test_a_rock_crushed_against_the_wall_never_points_outward(failures: Array[
 
 	small.queue_free()
 	large.queue_free()
+	await physics_frame
+
+
+func _test_a_rock_parented_off_the_origin_is_contained_in_world_space(failures: Array[String]) -> void:
+	# An asteroid seeded by an AsteroidField is parented to that field, not to
+	# Entities, so its own `position` is an offset from the field centre. Sector
+	# bounds are world space: containment that reads `position` clamps every
+	# rock left of or above its field's centre against a wall that is not there,
+	# and walls each field in at its own origin.
+	var field := Node2D.new()
+	field.position = Vector2(4000.0, 3000.0)
+	root.add_child(field)
+
+	var asteroid := (load(ASTEROID_SCENE) as PackedScene).instantiate() as Area2D
+	field.add_child(asteroid)
+	asteroid.add_to_group("asteroids")
+	asteroid.set_sector_bounds(SECTOR_BOUNDS)
+	asteroid.setup(0, Vector2(-60.0, -40.0), null, 0.0)
+	asteroid.position = Vector2(-300.0, -200.0)
+	var start := asteroid.global_position
+
+	for _step in 20:
+		await physics_frame
+
+	if asteroid.velocity.x >= 0.0 or asteroid.velocity.y >= 0.0:
+		failures.append(
+			"Containment: a rock at world %s reflected as if it were on the wall, velocity %s"
+			% [str(start), str(asteroid.velocity)]
+		)
+
+	var travelled: float = asteroid.global_position.distance_to(start)
+	if travelled > 200.0:
+		failures.append(
+			"Containment: a field-parented rock jumped %f px, from %s to %s"
+			% [travelled, str(start), str(asteroid.global_position)]
+		)
+
+	asteroid.queue_free()
+	field.queue_free()
 	await physics_frame
