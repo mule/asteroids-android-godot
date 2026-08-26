@@ -189,27 +189,41 @@ func get_min_landmark_separation(fallback: float) -> float:
 
 ## Where this sector's stations sit.
 ##
-## Rejection sampling against everything already placed and against `avoid` --
-## the player's own spawn, in practice. Two stations on top of each other put
-## one ship inside two dock zones and hand the dock to whichever polled first,
-## and a station on the spawn point docks the player before the run starts.
+## Rejection sampling against everything already placed, against `avoid` -- the
+## player's own spawn, in practice -- and against the asteroid fields this
+## sector has already laid down. Two stations on top of each other put one ship
+## inside two dock zones and hand the dock to whichever polled first; a station
+## on the spawn point docks the player before the run starts; and a station
+## inside a field parks the player, controls disabled, in the one part of the
+## sector that is manufacturing rocks.
 ##
-## Best effort, not a guarantee: after `_PLACEMENT_ATTEMPTS` tries the furthest
-## candidate seen is taken. A sector too small to separate the stations it asks
-## for must still produce them -- silently returning fewer would leave the
-## sector with no destination at all, which is worse than a crowded one.
+## The field test is deliberately not folded into `separation`. `separation` is
+## a centre-to-centre figure between landmarks of no particular size, but a
+## field is a disc with a radius of its own, and what has to clear it is not
+## the station's centre -- it is the whole dock zone the player has to sit
+## still inside. Both are measured off the live radii, so widening a field or a
+## dock zone later cannot silently drop a dock zone back into a belt.
+##
+## Best effort, not a guarantee: after `_PLACEMENT_ATTEMPTS` tries the candidate
+## that misses by the least is taken. A sector too small to separate the
+## stations it asks for must still produce them -- silently returning fewer
+## would leave the sector with no destination at all, which is worse than a
+## crowded one.
 func get_station_positions(
 	rng: RandomNumberGenerator,
 	count: int,
 	edge_inset: float = 0.0,
 	min_separation: float = -1.0,
-	avoid: Array = []
+	avoid: Array = [],
+	field_clearance: float = 0.0
 ) -> Array[Vector2]:
 	var separation := get_min_landmark_separation(0.0) if min_separation < 0.0 else min_separation
 	var placed: Array[Vector2] = []
 
 	for _index in maxi(0, count):
-		placed.append(_pick_separated_position(rng, placed, avoid, separation, edge_inset))
+		placed.append(
+			_pick_separated_position(rng, placed, avoid, separation, edge_inset, field_clearance)
+		)
 
 	return placed
 
@@ -219,23 +233,52 @@ func _pick_separated_position(
 	placed: Array[Vector2],
 	avoid: Array,
 	separation: float,
-	edge_inset: float
+	edge_inset: float,
+	field_clearance: float
 ) -> Vector2:
 	var best := Vector2.ZERO
-	var best_gap := -1.0
+	# Scored on slack rather than on distance, because the two requirements are
+	# not in the same units of "far enough": one is a centre-to-centre gap, the
+	# other is clearance beyond a field's edge. Subtracting each requirement
+	# makes them comparable, and the tighter of the two is what the candidate is
+	# worth. Seeded at -INF, not -1.0: a candidate can now miss by more than a
+	# whole pixel and still be the best one seen.
+	var best_slack := -INF
 
 	for _attempt in _PLACEMENT_ATTEMPTS:
 		var candidate := get_random_position(rng, edge_inset)
-		var gap := _get_nearest_gap(candidate, placed, avoid)
+		var slack := minf(
+			_get_nearest_gap(candidate, placed, avoid) - separation,
+			_get_field_edge_gap(candidate) - field_clearance
+		)
 
-		if gap >= separation:
+		if slack >= 0.0:
 			return candidate
 
-		if gap > best_gap:
-			best_gap = gap
+		if slack > best_slack:
+			best_slack = slack
 			best = candidate
 
 	return best
+
+
+## Distance from `candidate` to the nearest asteroid field's EDGE rather than
+## its centre -- a field is a disc, and what is being kept out of it is a disc
+## too, so the centre-to-centre figure the other landmarks use would have to
+## guess at a radius it cannot see. INF when the sector holds no fields, which
+## leaves a station in an empty sector unconstrained instead of unplaceable.
+##
+## Measured against `field.position` for the reason
+## `_get_nearest_field_distance` gives: placement works in the definition's own
+## bounds space and `place_content` writes that straight to `field.position`.
+func _get_field_edge_gap(candidate: Vector2) -> float:
+	var gap := INF
+
+	for field in get_fields():
+		var radius: float = field.field_radius if "field_radius" in field else 0.0
+		gap = minf(gap, candidate.distance_to(field.position) - radius)
+
+	return gap
 
 
 func _get_nearest_gap(candidate: Vector2, placed: Array[Vector2], avoid: Array) -> float:

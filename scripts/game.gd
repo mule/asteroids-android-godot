@@ -256,14 +256,21 @@ func _spawn_split_asteroids(size_tier: int, hit_position: Vector2, incoming_velo
 		_spawn_asteroid(size_tier, hit_position, velocity)
 
 
-## Stations are placed after the ship, so the player's own spawn can be handed
-## to the sector as a point to keep clear of. A station centred on the spawn
-## point would dock the player before the run had started.
+## Stations are placed after the ship AND after the asteroid fields, so the
+## sector can be handed both the player's own spawn and the fields it just laid
+## down as things to keep clear of. A station centred on the spawn point would
+## dock the player before the run had started, and one inside a field parks the
+## player -- controls disabled, by design -- in the part of the sector that is
+## producing the rocks. On the shipped sector that is not a rare seed: the only
+## station's 190 px dock zone reached 93 px inside `asteroid_field_05` on every
+## run, and a ship docked there lost 50 hull in 30 seconds -- at the one place
+## in the sector that sells hull back. The same seed with the station moved
+## clear of the fields took none.
 ##
 ## Built before they are placed, because how far a station has to stay from the
-## wall depends on how wide its own dock zone is, and that is a property of the
-## scene. Measured off the live shape rather than assumed here, for the same
-## reason `get_undock_position()` is.
+## wall and from a belt both depend on how wide its own dock zone is, and that
+## is a property of the scene. Measured off the live shape rather than assumed
+## here, for the same reason `get_undock_position()` is.
 func _spawn_stations() -> void:
 	if station_scene == null:
 		return
@@ -281,7 +288,8 @@ func _spawn_stations() -> void:
 		count,
 		_get_station_edge_inset(stations[0]),
 		-1.0,
-		[player_ship.global_position]
+		[player_ship.global_position],
+		stations[0].get_dock_zone_radius()
 	)
 
 	for index in stations.size():

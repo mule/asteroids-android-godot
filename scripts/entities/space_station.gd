@@ -31,7 +31,9 @@ signal undocked(ship: Node2D)
 @export var hull_clearance: float = 10.0
 ## How much of a ramming ship's speed survives the bounce off the hull.
 @export var hull_bounce_factor: float = 0.35
-@export var hull_color: Color = Color(0.46, 0.52, 0.62, 1.0)
+## Only the dock ring is drawn from script. The hull's colour lives on
+## `SpaceStation.tscn`'s Polygon2D, so an export for it here would be an
+## inspector field that silently does nothing.
 @export var dock_ring_color: Color = Color(0.45, 0.85, 0.95, 0.22)
 
 @onready var dock_zone: Area2D = $DockZone
@@ -144,6 +146,16 @@ func get_hull_radius() -> float:
 ## and the purchase.
 func get_affordable_repair_points(systems: Node) -> int:
 	if systems == null or not is_instance_valid(systems):
+		return 0
+
+	# The third way these two questions can disagree, after the sub-point
+	# deficit and the empty balance: `ShipSystems.repair()` refuses outright
+	# once the run has ended, while `spend_credits()` does not. Without this the
+	# public `buy_repair()` would take the money and deliver no hull. Nothing in
+	# the UI reaches it today -- `_end_game` drops `active_station` on the same
+	# signal -- but the authority on what a purchase delivers has to answer for
+	# the method as well as for the button.
+	if "run_ended" in systems and systems.run_ended:
 		return 0
 
 	return _affordable_points(

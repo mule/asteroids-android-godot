@@ -20,6 +20,7 @@ func _init() -> void:
 	await _test_repair_fails_cleanly_without_credits(failures)
 	await _test_refuel_costs_credits_and_fills_the_tank(failures)
 	await _test_refuel_fails_cleanly_without_credits(failures)
+	await _test_a_repair_after_the_run_ended_takes_no_credits(failures)
 	await _test_undocking_restores_control_and_does_not_redock(failures)
 	await _test_undocking_is_never_gated_on_payment(failures)
 	await _test_the_station_hull_damages_the_ship(failures)
@@ -30,6 +31,7 @@ func _init() -> void:
 	await _test_a_deficit_under_one_point_is_not_offered(failures)
 	await _test_pausing_stands_the_dock_panel_down(failures)
 	await _test_stations_are_placed_in_the_sector_clear_of_the_player(failures)
+	await _test_stations_are_placed_clear_of_the_asteroid_fields(failures)
 
 	for failure in failures:
 		printerr("FAIL: ", failure)
@@ -207,6 +209,44 @@ func _test_repair_fails_cleanly_without_credits(failures: Array[String]) -> void
 		failures.append("Repair: a refused purchase moved the hull to %f" % systems.hull)
 	if systems.credits != 0:
 		failures.append("Repair: a refused purchase left the balance at %d" % systems.credits)
+
+	await _end_game_scene(game)
+
+
+## `ShipSystems.repair()` refuses once the run has ended, but `spend_credits()`
+## does not, so an unguarded `buy_repair()` charges for hull it cannot deliver.
+## The UI does not reach this today, but `buy_repair` is public and the station
+## is the single authority on what a purchase is worth -- an authority that has
+## to be right for callers as well as for buttons.
+func _test_a_repair_after_the_run_ended_takes_no_credits(failures: Array[String]) -> void:
+	var game: Node = await _start_empty_game()
+	var station: Area2D = await _add_station(game, Vector2(900.0, 0.0))
+	var systems: Node = game.ship_systems
+	await _approach(game, station, station.dock_speed_limit * 0.5)
+
+	systems.add_credits(500)
+	systems.apply_damage(systems.max_hull)
+
+	if not systems.run_ended:
+		failures.append("Run-ended repair: the setup did not actually end the run")
+
+	var credits_before: int = systems.credits
+	var hull_before: float = systems.hull
+
+	if station.get_affordable_repair_points(systems) != 0:
+		failures.append("Run-ended repair: a repair was still offered after the run ended")
+
+	var bought: int = station.buy_repair(systems)
+
+	if bought != 0:
+		failures.append("Run-ended repair: bought %d points on a ship whose run had ended" % bought)
+	if systems.credits != credits_before:
+		failures.append(
+			"Run-ended repair: charged %d credits for hull it could not deliver"
+			% [credits_before - systems.credits]
+		)
+	if not is_equal_approx(systems.hull, hull_before):
+		failures.append("Run-ended repair: the hull moved to %f after the run ended" % systems.hull)
 
 	await _end_game_scene(game)
 
@@ -582,3 +622,78 @@ func _test_stations_are_placed_in_the_sector_clear_of_the_player(failures: Array
 			)
 
 	await _end_game_scene(game)
+
+
+## A station inside an asteroid field is a destination inside a hazard, and the
+## player arrives at it with the controls switched off. This is not a rare
+## draw: before the fix the shipped sector put the only station's dock zone
+## 93 px inside `asteroid_field_05` on every single run, and a ship docked
+## there lost 50 hull in 30 seconds -- at the one place in the sector that
+## sells hull back. A station moved clear of the fields on the same seed took
+## none.
+##
+## Asserted twice: once on the sector the game actually ships, and once across
+## 64 draws of the sampler itself, because the existing placement test's own
+## warning applies here too -- a single seeded draw can pass by luck.
+func _test_stations_are_placed_clear_of_the_asteroid_fields(failures: Array[String]) -> void:
+	var game := (load(GAME_SCENE) as PackedScene).instantiate()
+	game.auto_start = false
+	root.add_child(game)
+	await physics_frame
+	game._start_new_game()
+	await physics_frame
+
+	if game.sector.get_fields().is_empty():
+		failures.append("Field clearance: the sector placed no asteroid fields to test against")
+
+	var stations := get_nodes_in_group("stations")
+	if stations.is_empty():
+		failures.append("Field clearance: a new run placed no stations at all")
+	else:
+		for station: Node2D in stations:
+			var overlap := _get_worst_field_overlap(
+				game, station.global_position, station.get_dock_zone_radius()
+			)
+			if overlap > 0.0:
+				failures.append(
+					"Field clearance: the shipped sector put a dock zone %f px inside an asteroid field"
+					% overlap
+				)
+
+		# The invariant, not the sample. The shipped seed is one draw -- the one
+		# that happened to expose this -- so re-run the sampler on its own across
+		# many seeds against the same live fields.
+		var probe: Node2D = stations[0]
+		var zone: float = probe.get_dock_zone_radius()
+		var inset: float = game._get_station_edge_inset(probe)
+		var rng := RandomNumberGenerator.new()
+		var offenders := 0
+		for draw in 64:
+			rng.seed = draw
+			var positions: Array[Vector2] = game.sector.get_station_positions(
+				rng, 1, inset, -1.0, [game.player_ship.global_position], zone
+			)
+			for position: Vector2 in positions:
+				if _get_worst_field_overlap(game, position, zone) > 0.0:
+					offenders += 1
+
+		if offenders > 0:
+			failures.append(
+				"Field clearance: %d of 64 sampler draws put a dock zone inside an asteroid field"
+				% offenders
+			)
+
+	await _end_game_scene(game)
+
+
+## How far a disc of `radius` around `point` reaches into the nearest asteroid
+## field, in pixels. Zero or less is clear. Negative infinity when the sector
+## holds no fields, which is clear by default rather than an error here -- the
+## missing-fields case is reported on its own above.
+func _get_worst_field_overlap(game: Node, point: Vector2, radius: float) -> float:
+	var worst := -INF
+
+	for field: Node2D in game.sector.get_fields():
+		worst = maxf(worst, (field.field_radius + radius) - point.distance_to(field.global_position))
+
+	return worst
