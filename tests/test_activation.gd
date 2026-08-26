@@ -11,6 +11,12 @@ const RADIUS := 500.0
 ## 60Hz -- long enough for the camera's look-ahead to settle and for every
 ## awake rock to have resolved overlaps many times over.
 const BUDGET_FRAMES := 120
+## Discarded frames run before either measurement. The two runs are compared
+## against each other, so anything that makes the first one systematically more
+## expensive -- shader compilation, the physics server growing its broadphase,
+## the first pass through each script -- shows up as a saving that is really
+## just warm-up. Long enough for both runs to start from the same warm state.
+const BUDGET_WARMUP_FRAMES := 60
 
 
 func _init() -> void:
@@ -343,20 +349,34 @@ func _test_full_sector_survives_a_frame_budget_run(failures: Array[String]) -> v
 	var rocks: int = game.get_tree().get_nodes_in_group("asteroids").size()
 	var fields: int = game.sector.get_fields().size()
 
+	for _step in BUDGET_WARMUP_FRAMES:
+		await physics_frame
+
 	var activated_ms := await _measure_physics_ms(BUDGET_FRAMES)
 	var awake_fields := _awake_field_count(game)
 	var awake_rocks := _awake_asteroid_count(game)
 
 	# Control run: hold every field awake, which is what the sector cost before
 	# this issue and what it would cost again if activation regressed.
-	var all_awake_ms := await _measure_physics_ms_all_awake(game, BUDGET_FRAMES)
+	var control := await _measure_physics_ms_all_awake(game, BUDGET_FRAMES)
+	var all_awake_ms: float = control["ms"]
+	var control_awake_rocks: int = control["awake_rocks"]
 
 	print(
 		"ACTIVATION BUDGET: %d fields / %d asteroids in the sector; %d fields / %d asteroids awake; "
 		% [fields, rocks, awake_fields, awake_rocks]
-		+ "%.4f ms physics/frame activated vs %.4f ms all-awake over %d frames"
-		% [activated_ms, all_awake_ms, BUDGET_FRAMES]
+		+ "%.4f ms physics/frame activated vs %.4f ms all-awake (%d/%d rocks awake) over %d frames"
+		% [activated_ms, all_awake_ms, control_awake_rocks, rocks, BUDGET_FRAMES]
 	)
+
+	# The control is only evidence if it actually ran the sector awake. If
+	# activation is still holding the rocks down underneath it, both numbers
+	# describe the same run and the saving they bracket is noise.
+	if control_awake_rocks < rocks:
+		failures.append(
+			"Budget control: %d of %d asteroids were awake -- the control run did not defeat activation"
+			% [control_awake_rocks, rocks]
+		)
 
 	if awake_rocks >= rocks:
 		failures.append(
@@ -380,16 +400,40 @@ func _measure_physics_ms(frames: int) -> float:
 	return total / float(maxi(1, frames))
 
 
-## Same measurement with activation defeated: every field is forced back awake
-## after each pass, so the sector runs the way it did before this issue.
-func _measure_physics_ms_all_awake(game: Node, frames: int) -> float:
+## Same measurement with activation defeated, so the sector runs the way it did
+## before this issue.
+##
+## Defeated by widening the shipped `activation_radius`, not by forcing each
+## field awake between frames. `game.gd` drives activation from its own
+## `_physics_process`, and the Game node is the parent of `$Sector`, so its
+## pass runs *before* the fields it owns in the same frame: a wake applied from
+## this loop is undone before a single rock simulates, and the control quietly
+## measures the activated sector a second time. That reads as "activation saved
+## nothing measurable" -- the reported saving is then just the noise between
+## two identical runs. Widening the radius leaves the shipped drive itself
+## holding everything awake, which is the state worth comparing against.
+##
+## Returns the mean ms alongside how many rocks were actually awake at the end,
+## so the caller can assert the control did what it claims rather than trusting
+## the number it produced.
+func _measure_physics_ms_all_awake(game: Node, frames: int) -> Dictionary:
+	# Larger than the 8000x6000 sector's diagonal, so every field is inside the
+	# radius no matter where the camera sits.
+	var saved_radius: float = game.activation_radius
+	game.activation_radius = 100000.0
+
+	for _step in BUDGET_WARMUP_FRAMES:
+		await physics_frame
+
 	var total := 0.0
 	for _step in frames:
-		for field in game.sector.get_fields():
-			Activation.set_entity_active(field, true)
 		await physics_frame
 		total += Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
-	return total / float(maxi(1, frames))
+
+	var awake_rocks := _awake_asteroid_count(game)
+	game.activation_radius = saved_radius
+
+	return {"ms": total / float(maxi(1, frames)), "awake_rocks": awake_rocks}
 
 
 func _awake_asteroid_count(game: Node) -> int:
