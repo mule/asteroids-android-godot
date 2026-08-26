@@ -356,8 +356,10 @@ func _test_full_sector_survives_a_frame_budget_run(failures: Array[String]) -> v
 	var awake_fields := _awake_field_count(game)
 	var awake_rocks := _awake_asteroid_count(game)
 
-	# Control run: hold every field awake, which is what the sector cost before
-	# this issue and what it would cost again if activation regressed.
+	# Control run: the same sector with activation defeated, which is what it
+	# cost before this issue and what it would cost again if activation
+	# regressed. See _measure_physics_ms_all_awake() for why it is defeated by
+	# widening the radius rather than by waking the fields from here.
 	var control := await _measure_physics_ms_all_awake(game, BUDGET_FRAMES)
 	var all_awake_ms: float = control["ms"]
 	var control_awake_rocks: int = control["awake_rocks"]
