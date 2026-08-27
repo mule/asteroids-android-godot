@@ -1,0 +1,82 @@
+[gd_scene load_steps=2 format=3 uid="uid://b2yqk8m4vd0xw"]
+
+[ext_resource type="Script" path="res://scripts/ui/dock_panel.gd" id="1_dock"]
+
+[node name="DockPanel" type="CanvasLayer"]
+process_mode = 3
+layer = 5
+script = ExtResource("1_dock")
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -220.0
+offset_top = -232.0
+offset_right = 220.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="Margin" type="MarginContainer" parent="Root/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 12
+
+[node name="Body" type="VBoxContainer" parent="Root/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="TitleLabel" type="Label" parent="Root/Panel/Margin/Body"]
+layout_mode = 2
+text = "Docked"
+horizontal_alignment = 1
+
+[node name="HullLabel" type="Label" parent="Root/Panel/Margin/Body"]
+layout_mode = 2
+text = "Hull"
+
+[node name="FuelLabel" type="Label" parent="Root/Panel/Margin/Body"]
+layout_mode = 2
+text = "Fuel"
+
+[node name="CreditsLabel" type="Label" parent="Root/Panel/Margin/Body"]
+layout_mode = 2
+text = "Credits"
+
+[node name="Actions" type="HBoxContainer" parent="Root/Panel/Margin/Body"]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="RepairButton" type="Button" parent="Root/Panel/Margin/Body/Actions"]
+custom_minimum_size = Vector2(120, 48)
+layout_mode = 2
+focus_mode = 0
+text = "Repair"
+
+[node name="RefuelButton" type="Button" parent="Root/Panel/Margin/Body/Actions"]
+custom_minimum_size = Vector2(120, 48)
+layout_mode = 2
+focus_mode = 0
+text = "Refuel"
+
+[node name="UndockButton" type="Button" parent="Root/Panel/Margin/Body/Actions"]
+custom_minimum_size = Vector2(120, 48)
+layout_mode = 2
+focus_mode = 0
+text = "Undock"

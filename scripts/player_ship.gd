@@ -34,6 +34,11 @@ var thrust_material: ShaderMaterial
 var sector_bounds: Rect2 = Rect2()
 var boundary_margin: float = 600.0
 var boundary_warning_active: bool = false
+## The station this ship is parked at, or null. Docking is a state of the
+## ship rather than a flag on the station alone, because everything that
+## asks "can this ship act?" -- the station itself, the dock panel, the
+## game's wiring -- has the ship in hand and not the station.
+var docked_station: Node2D = null
 
 
 func _ready() -> void:
@@ -206,12 +211,40 @@ func reset_for_respawn(spawn_position: Vector2) -> void:
 	velocity = Vector2.ZERO
 	fire_cooldown_remaining = 0.0
 	thrust_flame.visible = false
+	# A new run starts in open space. Leaving a stale station here would make
+	# `is_docked()` refuse the first real dock of the run.
+	docked_station = null
 	_set_boundary_warning(false)
 
 
 func set_controls_enabled(value: bool) -> void:
 	controls_enabled = value
 	thrust_flame.visible = false
+
+
+func is_docked() -> bool:
+	return docked_station != null and is_instance_valid(docked_station)
+
+
+## Park at a station. The velocity has to go as well as the controls: a docked
+## ship is held by `_physics_process`'s disabled-controls branch, which stops
+## reading the stick but does not stop what the ship was already carrying, and
+## the moment it undocks that stored speed would fling it straight back through
+## the station it just left.
+func enter_dock(station: Node2D) -> void:
+	docked_station = station
+	velocity = Vector2.ZERO
+	fire_cooldown_remaining = 0.0
+	set_controls_enabled(false)
+	_set_boundary_warning(false)
+
+
+## Hand the controls back. The station moves the ship clear of its dock zone
+## before calling this -- see SpaceStation.undock().
+func exit_dock() -> void:
+	docked_station = null
+	velocity = Vector2.ZERO
+	set_controls_enabled(true)
 
 
 func set_invulnerable(value: bool) -> void:

@@ -1,0 +1,38 @@
+[gd_scene load_steps=4 format=3 uid="uid://cq3n8sxk2wv1d"]
+
+[ext_resource type="Script" path="res://scripts/entities/space_station.gd" id="1_station"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_hull"]
+radius = 72.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_dock"]
+radius = 190.0
+
+[node name="SpaceStation" type="Area2D"]
+collision_layer = 16
+collision_mask = 2
+monitorable = false
+script = ExtResource("1_station")
+
+[node name="HullShape" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(70, 0, 49, 49, 0, 70, -49, 49, -70, 0, -49, -49, 0, -70, 49, -49)
+color = Color(0.46, 0.52, 0.62, 1)
+
+[node name="CoreShape" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(34, 0, 17, 29, -17, 29, -34, 0, -17, -29, 17, -29)
+color = Color(0.72, 0.8, 0.9, 1)
+
+[node name="DockLights" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(-8, -70, 8, -70, 8, -52, -8, -52)
+color = Color(0.45, 0.85, 0.95, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_hull")
+
+[node name="DockZone" type="Area2D" parent="."]
+collision_layer = 16
+collision_mask = 2
+monitorable = false
+
+[node name="DockZoneShape" type="CollisionShape2D" parent="DockZone"]
+shape = SubResource("CircleShape2D_dock")
