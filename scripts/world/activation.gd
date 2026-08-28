@@ -28,6 +28,15 @@ const SLEEP_SCALE := 1.15
 ## place so `game.gd` and the fields cannot drift apart on the spelling.
 const GROUP_ASTEROID_FIELDS := &"asteroid_fields"
 
+## Rocks that have drifted clear of the field that spawned them, activated one
+## at a time against their own position. A field is only a useful unit of
+## activation for as long as its rocks are actually in it: `asteroid.gd`
+## integrates its own velocity and is clamped to the SECTOR, so a rock's
+## distance from its field centre grows without bound while `field_radius`
+## stays at the spawn scatter. Past that radius the field's sleep state is no
+## longer an answer about the rock, so the rock starts answering for itself.
+const GROUP_LOOSE_ASTEROIDS := &"loose_asteroids"
+
 ## Sleep state and the pre-sleep snapshot restored on wake. Metadata rather
 ## than a dictionary keyed by instance id: it dies with the node, so a freed
 ## entity cannot leak an entry or, worse, hand its stale snapshot to whatever

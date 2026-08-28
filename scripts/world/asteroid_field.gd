@@ -3,6 +3,10 @@ class_name AsteroidField
 
 
 signal field_cleared(field: Node2D)
+## A rock has drifted past `field_radius` and is no longer represented by this
+## field's position. Emitted rather than acted on here: the field does not know
+## where loose rocks live, and reparenting is the caller's decision.
+signal asteroid_escaped(field: Node2D, asteroid: Area2D)
 
 @export var field_name: StringName
 @export var field_radius: float = 360.0
@@ -57,6 +61,26 @@ func seed_field(rng: RandomNumberGenerator, asteroid_scene: PackedScene, visual_
 			asteroid.connect("destroyed", _on_asteroid_destroyed)
 
 	_emit_cleared_if_ready()
+
+
+## Runs only while the field is awake -- a slept field is PROCESS_MODE_DISABLED,
+## so this is free for exactly the fields that cannot be drifting. The work is
+## one length check per rock the field still holds, which is the set already
+## being simulated, not the whole sector.
+func _physics_process(_delta: float) -> void:
+	for child in get_children():
+		var asteroid := child as Area2D
+		if asteroid == null or not asteroid.is_in_group("asteroids"):
+			continue
+
+		# Local position: the offset from this field's own centre, which is
+		# what `field_radius` is measured in. Comparing global positions here
+		# would silently drift apart from it the first time a Sector is placed
+		# anywhere but the origin.
+		if asteroid.position.length() <= field_radius:
+			continue
+
+		asteroid_escaped.emit(self, asteroid)
 
 
 func get_active_asteroid_count() -> int:

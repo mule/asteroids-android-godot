@@ -85,6 +85,9 @@ var active_station: Node = null
 ## frame-budget measurable -- it is the number that a later issue adding
 ## content to the sector must not quietly grow.
 var active_field_count: int = 0
+## Rocks left simulating on their own account by the last activation pass --
+## those that have drifted clear of the field that spawned them.
+var active_loose_asteroid_count: int = 0
 
 
 func _ready() -> void:
@@ -130,6 +133,14 @@ func _physics_process(_delta: float) -> void:
 
 	active_field_count = Activation.update_group(
 		Activation.GROUP_ASTEROID_FIELDS,
+		follow_camera.global_position,
+		activation_radius
+	)
+	# Rocks that outran their field answer for themselves, against the same
+	# camera and the same radius. Counted separately so `active_field_count`
+	# stays the field-granular measurable the budget test reads.
+	active_loose_asteroid_count = Activation.update_group(
+		Activation.GROUP_LOOSE_ASTEROIDS,
 		follow_camera.global_position,
 		activation_radius
 	)
@@ -625,6 +636,8 @@ func _place_sector_content() -> void:
 	for field in sector.get_fields():
 		if field.has_signal("field_cleared"):
 			field.connect("field_cleared", _on_asteroid_field_cleared)
+		if field.has_signal("asteroid_escaped"):
+			field.connect("asteroid_escaped", _on_asteroid_escaped_field)
 		if field.has_method("seed_field"):
 			field.seed_field(random, asteroid_scene, asteroid_visual_assets)
 		_wire_field_asteroids(field)
@@ -642,6 +655,28 @@ func _wire_field_asteroids(field: Node2D) -> void:
 			var callback := Callable(self, "_on_asteroid_destroyed")
 			if not asteroid.is_connected("destroyed", callback):
 				asteroid.connect("destroyed", callback)
+
+
+## Move a drifted rock out from under its field and let it be activated on its
+## own position.
+##
+## Reparenting is what makes this work at all, not bookkeeping: `Activation`
+## sleeps a field with PROCESS_MODE_DISABLED, which disables the whole subtree,
+## so a rock still parented to a sleeping field cannot be woken by any group it
+## belongs to. `Entities` is the same home the split children already get, so
+## the rock keeps the lighting, sector-bounds and restart handling that node
+## already carries.
+##
+## The field keeps its `destroyed` connection and its active count. A field
+## whose rocks have wandered off is not cleared -- the player still has to
+## destroy them -- and `field_cleared` must not fire early just because they
+## left the circle.
+func _on_asteroid_escaped_field(field: Node2D, asteroid: Area2D) -> void:
+	if not is_instance_valid(asteroid) or asteroid.get_parent() != field:
+		return
+
+	asteroid.call_deferred("reparent", entities, true)
+	asteroid.call_deferred("add_to_group", Activation.GROUP_LOOSE_ASTEROIDS)
 
 
 func _on_asteroid_field_cleared(field: Node2D) -> void:

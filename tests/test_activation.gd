@@ -29,6 +29,7 @@ func _init() -> void:
 	await _test_is_within_counts_the_entity_extent(failures)
 	await _test_field_asteroids_stop_simulating_while_asleep(failures)
 	await _test_game_sleeps_distant_fields_from_the_camera(failures)
+	await _test_a_rock_that_drifted_out_of_its_field_simulates_on_its_own(failures)
 	await _test_full_sector_survives_a_frame_budget_run(failures)
 
 	for failure in failures:
@@ -323,6 +324,108 @@ func _test_game_sleeps_distant_fields_from_the_camera(failures: Array[String]) -
 			failures.append("Game activation: field %s never woke when the camera arrived" % far_field.field_name)
 		if far_field.process_mode == Node.PROCESS_MODE_DISABLED:
 			failures.append("Game activation: field %s woke but is still disabled" % far_field.field_name)
+
+	game.queue_free()
+	await process_frame
+
+
+## A rock is untethered from the moment it exists: `asteroid.gd` integrates its
+## own velocity and `_contain_in_sector()` clamps it to the SECTOR, not to the
+## field it was scattered in. So a field's true reach grows without bound while
+## `field_radius` stays frozen at its spawn value, and activation -- which is
+## field-granular and measured from the field CENTRE -- hands a far-flung rock
+## the sleep state of a point it is nowhere near.
+##
+## Parked exactly on such a rock the player gets an asteroid at the dead centre
+## of the screen that is invisible, frozen, and cannot be hit or hit them, and
+## that materialises on top of them the moment the field's centre drifts back
+## into range. That is the mirror image of the failure this issue exists to
+## prevent, so it is asserted here rather than left to the field's extent.
+func _test_a_rock_that_drifted_out_of_its_field_simulates_on_its_own(failures: Array[String]) -> void:
+	var game := (load(GAME_SCENE) as PackedScene).instantiate()
+	game.auto_start = false
+	root.add_child(game)
+	await physics_frame
+	game._start_new_game()
+	await physics_frame
+
+	var fields: Array[Node2D] = game.sector.get_fields()
+	if fields.is_empty():
+		failures.append("Drifted rock: the shipped sector placed no fields")
+		game.queue_free()
+		await process_frame
+		return
+
+	var field: Node2D = fields[0]
+	var rocks := _field_asteroids(field)
+	if rocks.is_empty():
+		failures.append("Drifted rock: field %s seeded no asteroids" % field.field_name)
+		game.queue_free()
+		await process_frame
+		return
+
+	# Park the camera on the field first. A rock can only drift while its field
+	# is awake -- a slept field is PROCESS_MODE_DISABLED, so its rocks are not
+	# integrating either -- and starting from a slept field would set up a
+	# state the running game cannot reach.
+	game.follow_camera.set_target(null)
+	game.follow_camera.global_position = field.global_position
+	await physics_frame
+	await physics_frame
+
+	if not Activation.is_active(field):
+		failures.append("Drifted rock: the field under the camera never woke, so nothing could drift")
+		game.queue_free()
+		await process_frame
+		return
+
+	# Drift the rock toward the sector centre, so the displacement cannot be
+	# undone by the boundary containment that would fire near an edge.
+	var rock: Area2D = rocks[0]
+	var inward: Vector2 = game.sector.get_center() - field.global_position
+	var direction := inward.normalized() if inward.length() > 1.0 else Vector2.RIGHT
+	rock.global_position = field.global_position + direction * 2500.0
+	await physics_frame
+	await physics_frame
+
+	# Park the camera exactly on the rock. Its field is now far outside the
+	# activation radius and must sleep; the rock the player is looking at
+	# must not.
+	game.follow_camera.set_target(null)
+	game.follow_camera.global_position = rock.global_position
+	await physics_frame
+	await physics_frame
+
+	if not is_instance_valid(rock):
+		failures.append("Drifted rock: the rock was freed before it could be measured")
+		game.queue_free()
+		await process_frame
+		return
+
+	var separation: float = rock.global_position.distance_to(field.global_position)
+	var field_reach: float = game.activation_radius * Activation.SLEEP_SCALE + field.field_radius
+	if separation <= field_reach:
+		failures.append(
+			"Drifted rock: the rock is %f from its field, inside the field's %f reach -- the setup never left the field"
+			% [separation, field_reach]
+		)
+	if Activation.is_active(field):
+		failures.append(
+			"Drifted rock: field %s is still awake at %f away, so the rock proves nothing"
+			% [field.field_name, separation]
+		)
+
+	if not rock.can_process():
+		failures.append(
+			"Drifted rock: a rock at the centre of the screen is frozen, inheriting its field's sleep from %f away"
+			% separation
+		)
+	if not rock.is_visible_in_tree():
+		failures.append("Drifted rock: a rock at the centre of the screen is invisible")
+	if not rock.monitoring or not rock.monitorable:
+		failures.append("Drifted rock: a rock at the centre of the screen can neither be hit nor hit the player")
+	if not rock.is_in_group("asteroids"):
+		failures.append("Drifted rock: the rock lost its asteroids group")
 
 	game.queue_free()
 	await process_frame
