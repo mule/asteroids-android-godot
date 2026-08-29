@@ -1,3 +1,13 @@
+## A planet or a moon: a large, static landmark that the sector places once and
+## the player navigates around.
+##
+## Draw order is a three-way contract and lives in two files. CelestialBody.tscn
+## carries z_index -20; Game.tscn carries -30 on StarsFar and -25 on StarsMid.
+## Bodies therefore sit behind every entity (z 0) and in front of both star
+## layers, which is what #51 asks for. The star layers are Parallax2D nodes in
+## the same canvas as the Sector, so leaving them at the default z_index 0 --
+## as they were before this body existed -- puts the stars in front of the
+## planets and lets a starfield shine straight through a moon.
 extends Area2D
 class_name CelestialBody
 
@@ -77,6 +87,12 @@ func set_world_light_direction(value: Vector2) -> void:
 	_update_shader_light_direction()
 
 
+## Deliberate no-ops, not stubs awaiting an implementation. game.gd pushes the
+## sector extent to every entity that draws a box from it so that a window
+## resize can move where the world ends; a celestial body is placed once, from
+## bounds, and never wraps, is never contained and never pushed. Kept rather
+## than deleted so the duck-typed loop in _apply_sector_bounds_to_entity()
+## finding no method on a body reads as intent instead of an omission.
 func set_sector_bounds(_bounds: Rect2) -> void:
 	pass
 
@@ -133,9 +149,6 @@ func _apply_visual_asset() -> void:
 	body_shape.color = asset.fill_color
 	body_shape.scale = Vector2.ONE * visual_scale
 	_body_material = MATERIAL_RUNTIME.apply_material_definition(body_shape, asset.material_definition)
-
-	if "outline_color" in asset and asset.outline_color.a > 0.0:
-		body_shape.texture = null
 
 	if "secondary_polygons" in asset:
 		for secondary_polygon: Resource in asset.secondary_polygons:

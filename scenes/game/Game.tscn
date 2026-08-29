@@ -44,6 +44,7 @@ mouse_filter = 2
 color = Color(0.0352941, 0.0392157, 0.0588235, 1)
 
 [node name="StarsFar" type="Parallax2D" parent="."]
+z_index = -30
 scroll_scale = Vector2(0.15, 0.15)
 
 [node name="Layer" type="Node2D" parent="StarsFar"]
@@ -55,6 +56,7 @@ min_alpha = 0.15
 max_alpha = 0.4
 
 [node name="StarsMid" type="Parallax2D" parent="."]
+z_index = -25
 scroll_scale = Vector2(0.4, 0.4)
 
 [node name="Layer" type="Node2D" parent="StarsMid"]

@@ -145,8 +145,7 @@ func find_free_position(rng: RandomNumberGenerator, radius: float, min_separatio
 
 	for attempt in 32:
 		var candidate := get_random_position(rng, radius)
-		var field_slack := _get_nearest_field_distance(candidate) - min_separation
-		var slack := field_slack
+		var slack := _get_nearest_field_distance(candidate) - min_separation
 
 		if slack >= 0.0:
 			return candidate
