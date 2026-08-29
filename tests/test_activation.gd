@@ -11,20 +11,45 @@ const RADIUS := 500.0
 ## 60Hz -- long enough for the camera's look-ahead to settle and for every
 ## awake rock to have resolved overlaps many times over.
 const BUDGET_FRAMES := 120
-## Discarded frames run before either measurement. The two runs are compared
-## against each other, so anything that makes the first one systematically more
-## expensive -- shader compilation, the physics server growing its broadphase,
-## the first pass through each script -- shows up as a saving that is really
-## just warm-up. Long enough for both runs to start from the same warm state.
-const BUDGET_WARMUP_FRAMES := 60
+## Discarded frames run before every measurement. The runs are compared against
+## each other, so anything that makes one of them systematically more expensive
+## -- shader compilation, the physics server growing its broadphase, the first
+## pass through each script -- shows up as a saving that is really just
+## warm-up.
+##
+## 180 rather than 60 because 60 is not past it. Measured on the shipped sector
+## at a fixed workload, per-60-frame means: 1.10, **6.36**, 0.67, 0.63, 0.66,
+## 0.69, ... -- a one-off spike lands in frames 60-119 and steady state does
+## not arrive until frame ~120. A 60-frame warm-up puts that spike inside the
+## first measurement window, and at 60 the same workload measured twice in a
+## row came out 2.97 ms then 0.70 ms. That 2.2 ms of position penalty is larger
+## than the entire saving being measured, so whichever run went first lost:
+## reversing the order reversed the verdict. At 180 the same A/A pair agrees to
+## within 2-10% and the activated run is the cheaper one in both orders.
+## `BUDGET_DRIFT_TOLERANCE` is what keeps that true.
+const BUDGET_WARMUP_FRAMES := 180
+## How far apart the two identical activated runs may be before the comparison
+## against the control stops meaning anything. The pathology this guards was
+## 320%; the residual at BUDGET_WARMUP_FRAMES is 2-10%. Set between the two,
+## nearer the pathology, so a loaded CI box does not flake but a warm-up that
+## has stopped being long enough is caught.
+const BUDGET_DRIFT_TOLERANCE := 0.5
 ## Frames `_park_camera` will wait for the drawn view to catch up with the
 ## camera node before calling the setup broken.
 const PARK_TIMEOUT_FRAMES := 40
+
+## Games stood up so far. Only `_test_the_focus_is_on_the_ship_from_the_first_frame`
+## reads it, and only to refuse to report a pass it cannot back up.
+var _games_instanced: int = 0
 
 
 func _init() -> void:
 	var failures: Array[String] = []
 
+	# First, and it has to stay first -- it is the only case that needs a
+	# Camera2D that has never been current in this process. It says so itself
+	# if it is moved.
+	await _test_the_focus_is_on_the_ship_from_the_first_frame(failures)
 	await _test_distant_entity_sleeps(failures)
 	await _test_returning_focus_fully_restores_the_entity(failures)
 	await _test_boundary_does_not_oscillate(failures)
@@ -71,6 +96,16 @@ func _make_entity(at: Vector2) -> Node2D:
 ##
 ## Polls for arrival and reports if it never happens, so a silent non-arrival
 ## fails loudly instead of turning some later assertion into a mystery.
+## Every Game this suite stands up goes through here, so
+## `_test_the_focus_is_on_the_ship_from_the_first_frame` can tell whether it
+## still has the cold process it needs. See that test.
+func _make_game() -> Node:
+	var game := (load(GAME_SCENE) as PackedScene).instantiate()
+	game.auto_start = false
+	_games_instanced += 1
+	return game
+
+
 func _park_camera(game: Node, at: Vector2, failures: Array[String], label: String) -> void:
 	game.follow_camera.set_target(null)
 	game.follow_camera.global_position = at
@@ -317,8 +352,7 @@ func _test_field_asteroids_stop_simulating_while_asleep(failures: Array[String])
 ## camera leads the ship by up to max_look_ahead, and simulating what the ship
 ## is next to instead of what the player is looking at is the whole bug.
 func _test_game_sleeps_distant_fields_from_the_camera(failures: Array[String]) -> void:
-	var game := (load(GAME_SCENE) as PackedScene).instantiate()
-	game.auto_start = false
+	var game := _make_game()
 	root.add_child(game)
 	await physics_frame
 	game._start_new_game()
@@ -382,8 +416,7 @@ func _test_game_sleeps_distant_fields_from_the_camera(failures: Array[String]) -
 ## into range. That is the mirror image of the failure this issue exists to
 ## prevent, so it is asserted here rather than left to the field's extent.
 func _test_a_rock_that_drifted_out_of_its_field_simulates_on_its_own(failures: Array[String]) -> void:
-	var game := (load(GAME_SCENE) as PackedScene).instantiate()
-	game.auto_start = false
+	var game := _make_game()
 	root.add_child(game)
 	await physics_frame
 	game._start_new_game()
@@ -474,8 +507,7 @@ func _test_a_rock_that_drifted_out_of_its_field_simulates_on_its_own(failures: A
 ## plus 16 small rocks -- more permanently-awake rocks than the 20 the entire
 ## sector starts with.
 func _test_a_split_child_sleeps_once_the_camera_leaves_it(failures: Array[String]) -> void:
-	var game := (load(GAME_SCENE) as PackedScene).instantiate()
-	game.auto_start = false
+	var game := _make_game()
 	root.add_child(game)
 	await physics_frame
 	game._start_new_game()
@@ -534,8 +566,7 @@ func _test_a_split_child_sleeps_once_the_camera_leaves_it(failures: Array[String
 ## the far edge of the visible rect is a full viewport diagonal away instead of
 ## a half one, and a rock the player is looking at goes to sleep.
 func _test_activation_follows_the_view_not_the_camera_node(failures: Array[String]) -> void:
-	var game := (load(GAME_SCENE) as PackedScene).instantiate()
-	game.auto_start = false
+	var game := _make_game()
 	root.add_child(game)
 	await physics_frame
 	game._start_new_game()
@@ -604,6 +635,52 @@ func _test_activation_follows_the_view_not_the_camera_node(failures: Array[Strin
 	await process_frame
 
 
+## A run must not open with everything around the player asleep.
+##
+## Camera2D publishes nothing until it has run a frame while current, so the
+## `reset_smoothing()` that `FollowCamera.set_target()` does at `_ready()` time
+## does not stick: left alone the view spends the opening frames of a run at
+## its top-left limit clamp, a whole sector from the ship. That was harmless
+## while only the renderer read the view -- it corrects itself before anything
+## is drawn -- but `Game._get_activation_focus()` now decides what to simulate
+## from it, so those frames would sleep the sector around the player at every
+## single start. `FollowCamera` seeds its smoothing on its first
+## `_physics_process` for this.
+func _test_the_focus_is_on_the_ship_from_the_first_frame(failures: Array[String]) -> void:
+	# Camera2D warms up once per process, not once per camera: a Game stood up
+	# after another one gets a viewport that has already had a current camera,
+	# and publishes its transform immediately whether or not the seed is there.
+	# So this case can only be proved from a cold process. Refuse to report a
+	# pass it cannot back up rather than going quietly green in the wrong slot.
+	if _games_instanced > 0:
+		failures.append(
+			"First frame: %d games were already stood up before this case ran, so a cold camera is gone and this proves nothing -- it must run first"
+			% _games_instanced
+		)
+		return
+
+	var game := _make_game()
+	root.add_child(game)
+	await physics_frame
+	game._start_new_game()
+	await physics_frame
+
+	var focus: Vector2 = game._get_activation_focus()
+	var drift: float = focus.distance_to(game.player_ship.global_position)
+	# The view is never exactly on the ship -- the drag margins hold it a fixed
+	# fraction of a screen behind -- but it must be on the same screen.
+	var tolerance: float = root.get_visible_rect().size.length() * 0.5
+
+	if drift > tolerance:
+		failures.append(
+			"First frame: the run opens with the focus %f from the ship (tolerance %f) -- the sector around the player starts asleep"
+			% [drift, tolerance]
+		)
+
+	game.queue_free()
+	await process_frame
+
+
 ## The budget baseline later issues must not regress.
 ##
 ## Measured with Performance.TIME_PHYSICS_PROCESS, not wall clock: the headless
@@ -615,8 +692,7 @@ func _test_activation_follows_the_view_not_the_camera_node(failures: Array[Strin
 ## run survives -- rather than a millisecond threshold, which would be a flaky
 ## test on shared CI. The numbers are printed so the PR can record them.
 func _test_full_sector_survives_a_frame_budget_run(failures: Array[String]) -> void:
-	var game := (load(GAME_SCENE) as PackedScene).instantiate()
-	game.auto_start = false
+	var game := _make_game()
 	root.add_child(game)
 	await physics_frame
 	game._start_new_game()
@@ -632,6 +708,14 @@ func _test_full_sector_survives_a_frame_budget_run(failures: Array[String]) -> v
 	var awake_fields := _awake_field_count(game)
 	var awake_rocks := _awake_asteroid_count(game)
 
+	# The same workload again, back to back. Nothing about the sector changed
+	# between the two, so any gap between them is the measurement's own
+	# position penalty -- and the number this test exists to report is only
+	# worth reporting while that penalty is small next to the saving. See
+	# BUDGET_WARMUP_FRAMES for the run where it was four times the saving and
+	# the reported baseline was really just "whichever ran first".
+	var activated_again_ms := await _measure_physics_ms(BUDGET_FRAMES)
+
 	# Control run: the same sector with activation defeated, which is what it
 	# cost before this issue and what it would cost again if activation
 	# regressed. See _measure_physics_ms_all_awake() for why it is defeated by
@@ -640,12 +724,26 @@ func _test_full_sector_survives_a_frame_budget_run(failures: Array[String]) -> v
 	var all_awake_ms: float = control["ms"]
 	var control_awake_rocks: int = control["awake_rocks"]
 
+	var drift: float = (
+		absf(activated_ms - activated_again_ms) / maxf(0.0001, maxf(activated_ms, activated_again_ms))
+	)
+
 	print(
 		"ACTIVATION BUDGET: %d fields / %d asteroids in the sector; %d fields / %d asteroids awake; "
 		% [fields, rocks, awake_fields, awake_rocks]
-		+ "%.4f ms physics/frame activated vs %.4f ms all-awake (%d/%d rocks awake) over %d frames"
+		+ "%.4f ms physics/frame activated vs %.4f ms all-awake (%d/%d rocks awake) over %d frames; "
 		% [activated_ms, all_awake_ms, control_awake_rocks, rocks, BUDGET_FRAMES]
+		+ "repeat of the activated run %.4f ms, drift %.1f%%"
+		% [activated_again_ms, drift * 100.0]
 	)
+
+	# A baseline nobody can reproduce is worse than no baseline: it becomes the
+	# number later issues are held to.
+	if drift > BUDGET_DRIFT_TOLERANCE:
+		failures.append(
+			"Budget run: the same workload measured %f then %f ms -- %.1f%% apart, over the %.1f%% tolerance. The warm-up is no longer reaching steady state, so these numbers are measurement position, not workload."
+			% [activated_ms, activated_again_ms, drift * 100.0, BUDGET_DRIFT_TOLERANCE * 100.0]
+		)
 
 	# The control is only evidence if it actually ran the sector awake. If
 	# activation is still holding the rocks down underneath it, both numbers
