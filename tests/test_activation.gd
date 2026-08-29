@@ -555,6 +555,19 @@ func _test_a_split_child_sleeps_once_the_camera_leaves_it(failures: Array[String
 	if not fragment.is_in_group("asteroids"):
 		failures.append("Split child: the fragment lost its asteroids group")
 
+	# And back. A fragment that sleeps and never wakes is worse than one that
+	# never slept: #49 calls a permanently frozen entity the failure mode that
+	# makes a sector feel broken, and a fragment is the one rock the player has
+	# already gone out of their way to create.
+	await _park_camera(game, fragment.global_position, failures, "Split child")
+
+	if not fragment.can_process():
+		failures.append("Split child: the fragment never woke when the camera came back")
+	if not fragment.is_visible_in_tree():
+		failures.append("Split child: the fragment came back invisible")
+	if not fragment.monitoring or not fragment.monitorable:
+		failures.append("Split child: the fragment came back unhittable")
+
 	game.queue_free()
 	await process_frame
 
