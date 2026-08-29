@@ -17,6 +17,9 @@ const BUDGET_FRAMES := 120
 ## the first pass through each script -- shows up as a saving that is really
 ## just warm-up. Long enough for both runs to start from the same warm state.
 const BUDGET_WARMUP_FRAMES := 60
+## Frames `_park_camera` will wait for the drawn view to catch up with the
+## camera node before calling the setup broken.
+const PARK_TIMEOUT_FRAMES := 40
 
 
 func _init() -> void:
@@ -30,6 +33,8 @@ func _init() -> void:
 	await _test_field_asteroids_stop_simulating_while_asleep(failures)
 	await _test_game_sleeps_distant_fields_from_the_camera(failures)
 	await _test_a_rock_that_drifted_out_of_its_field_simulates_on_its_own(failures)
+	await _test_a_split_child_sleeps_once_the_camera_leaves_it(failures)
+	await _test_activation_follows_the_view_not_the_camera_node(failures)
 	await _test_full_sector_survives_a_frame_budget_run(failures)
 
 	for failure in failures:
@@ -49,6 +54,46 @@ func _make_entity(at: Vector2) -> Node2D:
 	root.add_child(entity)
 	entity.add_to_group(TEST_GROUP)
 	return entity
+
+
+## Park the camera at a point and wait for the *view* to arrive there, rather
+## than assuming it has.
+##
+## Assigning `global_position` moves the camera node and leaves the drawn view
+## behind: `FollowCamera` enables position smoothing, and for the first frames
+## after a scene enters the tree Camera2D keeps publishing its previous
+## transform even through a `reset_smoothing()`. Activation is measured from
+## the view -- see `Game._get_activation_focus()` -- so a test that parked the
+## node and read the result two frames later would be asserting against a
+## state the setup had not reached. That is the shape of bug this suite's own
+## budget control already had once; it does not get to come back in the
+## fixture.
+##
+## Polls for arrival and reports if it never happens, so a silent non-arrival
+## fails loudly instead of turning some later assertion into a mystery.
+func _park_camera(game: Node, at: Vector2, failures: Array[String], label: String) -> void:
+	game.follow_camera.set_target(null)
+	game.follow_camera.global_position = at
+	game.follow_camera.reset_smoothing()
+
+	# The view never coincides exactly with the camera node: FollowCamera's
+	# drag margins hold it a fixed fraction of a screen behind. Arrival means
+	# "within the margin the drag can account for", not "equal".
+	var tolerance: float = root.get_visible_rect().size.length() * 0.25
+
+	for _step in PARK_TIMEOUT_FRAMES:
+		await physics_frame
+		if game._get_activation_focus().distance_to(at) <= tolerance:
+			# One more frame for `Game`'s activation pass to read the arrived
+			# view: `Game` is the camera's parent, so its _physics_process runs
+			# first and sees the previous frame's focus.
+			await physics_frame
+			return
+
+	failures.append(
+		"%s: the view never reached the parked point -- it is %f away after %d frames, so nothing after this proves anything"
+		% [label, game._get_activation_focus().distance_to(at), PARK_TIMEOUT_FRAMES]
+	)
 
 
 func _free_entity(entity: Node2D) -> void:
@@ -288,10 +333,7 @@ func _test_game_sleeps_distant_fields_from_the_camera(failures: Array[String]) -
 
 	# Park the camera on the first field and let activation run.
 	var near_field: Node2D = fields[0]
-	game.follow_camera.set_target(null)
-	game.follow_camera.global_position = near_field.global_position
-	await physics_frame
-	await physics_frame
+	await _park_camera(game, near_field.global_position, failures, "Game activation")
 
 	if not Activation.is_active(near_field):
 		failures.append("Game activation: the field under the camera is asleep")
@@ -316,9 +358,7 @@ func _test_game_sleeps_distant_fields_from_the_camera(failures: Array[String]) -
 			break
 
 	if far_field != null:
-		game.follow_camera.global_position = far_field.global_position
-		await physics_frame
-		await physics_frame
+		await _park_camera(game, far_field.global_position, failures, "Game activation")
 
 		if not Activation.is_active(far_field):
 			failures.append("Game activation: field %s never woke when the camera arrived" % far_field.field_name)
@@ -368,10 +408,7 @@ func _test_a_rock_that_drifted_out_of_its_field_simulates_on_its_own(failures: A
 	# is awake -- a slept field is PROCESS_MODE_DISABLED, so its rocks are not
 	# integrating either -- and starting from a slept field would set up a
 	# state the running game cannot reach.
-	game.follow_camera.set_target(null)
-	game.follow_camera.global_position = field.global_position
-	await physics_frame
-	await physics_frame
+	await _park_camera(game, field.global_position, failures, "Drifted rock")
 
 	if not Activation.is_active(field):
 		failures.append("Drifted rock: the field under the camera never woke, so nothing could drift")
@@ -391,10 +428,7 @@ func _test_a_rock_that_drifted_out_of_its_field_simulates_on_its_own(failures: A
 	# Park the camera exactly on the rock. Its field is now far outside the
 	# activation radius and must sleep; the rock the player is looking at
 	# must not.
-	game.follow_camera.set_target(null)
-	game.follow_camera.global_position = rock.global_position
-	await physics_frame
-	await physics_frame
+	await _park_camera(game, rock.global_position, failures, "Drifted rock")
 
 	if not is_instance_valid(rock):
 		failures.append("Drifted rock: the rock was freed before it could be measured")
@@ -426,6 +460,145 @@ func _test_a_rock_that_drifted_out_of_its_field_simulates_on_its_own(failures: A
 		failures.append("Drifted rock: a rock at the centre of the screen can neither be hit nor hit the player")
 	if not rock.is_in_group("asteroids"):
 		failures.append("Drifted rock: the rock lost its asteroids group")
+
+	game.queue_free()
+	await process_frame
+
+
+## A split child is parented to `Entities`, not to the field whose rock it came
+## from, so no field's sleep state is an answer about it. It has to be enrolled
+## as a loose rock or it simulates for the rest of the run at any distance.
+##
+## This is the population, not an edge case: at the shipped `asteroid_budget`
+## of 4 and `split_child_count` of 2, clearing a single field yields 8 medium
+## plus 16 small rocks -- more permanently-awake rocks than the 20 the entire
+## sector starts with.
+func _test_a_split_child_sleeps_once_the_camera_leaves_it(failures: Array[String]) -> void:
+	var game := (load(GAME_SCENE) as PackedScene).instantiate()
+	game.auto_start = false
+	root.add_child(game)
+	await physics_frame
+	game._start_new_game()
+	await physics_frame
+
+	var centre: Vector2 = game.sector.get_center()
+	# Spawned through the same call a split goes through, so the test cannot
+	# pass by a route the game does not take.
+	var fragment: Area2D = game._spawn_asteroid(1, centre, Vector2(30.0, 0.0))
+	await physics_frame
+
+	if not fragment.is_in_group("asteroids"):
+		failures.append("Split child: the fragment is not in the asteroids group")
+
+	# Park the view in the opposite corner of the sector. Inset by half a
+	# viewport because that is as far as the view can be taken: the camera
+	# limits `Game._apply_sector_bounds()` installs stop the drawn rect at the
+	# sector edge, so a park on the corner itself would never arrive.
+	var bounds: Rect2 = game.sector.get_bounds()
+	var inset: Vector2 = root.get_visible_rect().size * 0.5
+	await _park_camera(game, bounds.position + inset, failures, "Split child")
+
+	if not is_instance_valid(fragment):
+		failures.append("Split child: the fragment was freed before it could be measured")
+		game.queue_free()
+		await process_frame
+		return
+
+	var separation: float = fragment.global_position.distance_to(game._get_activation_focus())
+	if separation <= game.activation_radius * Activation.SLEEP_SCALE:
+		failures.append(
+			"Split child: the fragment is only %f from the focus, inside the %f sleep radius -- the setup never left it"
+			% [separation, game.activation_radius * Activation.SLEEP_SCALE]
+		)
+
+	if fragment.can_process():
+		failures.append(
+			"Split child: a fragment %f from the view is still simulating -- it is in no activation group"
+			% separation
+		)
+	if fragment.is_visible_in_tree():
+		failures.append("Split child: a fragment %f from the view is still drawing" % separation)
+	if fragment.monitoring or fragment.monitorable:
+		failures.append("Split child: a fragment %f from the view is still collidable" % separation)
+	if not fragment.is_in_group("asteroids"):
+		failures.append("Split child: the fragment lost its asteroids group")
+
+	game.queue_free()
+	await process_frame
+
+
+## Activation is measured from what is on screen, not from where the camera
+## node is. `FollowCamera` smooths, drags, and is clamped to the sector by
+## `apply_sector_limits()`, so at a sector corner the node sits on the corner
+## while the drawn view stops half a screen inside it. Measured from the node,
+## the far edge of the visible rect is a full viewport diagonal away instead of
+## a half one, and a rock the player is looking at goes to sleep.
+func _test_activation_follows_the_view_not_the_camera_node(failures: Array[String]) -> void:
+	var game := (load(GAME_SCENE) as PackedScene).instantiate()
+	game.auto_start = false
+	root.add_child(game)
+	await physics_frame
+	game._start_new_game()
+	await physics_frame
+
+	# Fly the ship hard into a corner, so the look-ahead is saturated at the
+	# same time the rendered view is clamped -- the worst case for the gap
+	# between the camera node and the view.
+	var bounds: Rect2 = game.sector.get_bounds()
+	var corner: Vector2 = bounds.position + bounds.size
+	game.player_ship.global_position = corner - Vector2(1200.0, 900.0)
+	for _step in 180:
+		game.player_ship.velocity = (corner - game.player_ship.global_position).normalized() * 900.0
+		await physics_frame
+
+	var view: Vector2 = root.get_visible_rect().size
+	var screen_centre: Vector2 = game.follow_camera.get_screen_center_position()
+	var away: Vector2 = screen_centre - game.follow_camera.global_position
+
+	if away.length() <= view.length() * 0.25:
+		failures.append(
+			"View focus: the camera node and the view centre are only %f apart, so the corner never clamped and the test proves nothing"
+			% away.length()
+		)
+
+	# The corner of the visible rect furthest from the camera node -- on screen,
+	# and the point the two candidate focuses disagree about most.
+	var direction := away.normalized() if away.length() > 1.0 else Vector2.RIGHT
+	var far_visible := screen_centre + Vector2(
+		signf(direction.x) * view.x * 0.5,
+		signf(direction.y) * view.y * 0.5
+	)
+
+	var rock: Area2D = game._spawn_asteroid(0, far_visible, Vector2.ZERO)
+	for _step in 6:
+		game.player_ship.velocity = (corner - game.player_ship.global_position).normalized() * 900.0
+		await physics_frame
+
+	if not is_instance_valid(rock):
+		failures.append("View focus: the rock was freed before it could be measured")
+		game.queue_free()
+		await process_frame
+		return
+
+	var on_screen: bool = (
+		absf(rock.global_position.x - screen_centre.x) <= view.x * 0.5
+		and absf(rock.global_position.y - screen_centre.y) <= view.y * 0.5
+	)
+	if not on_screen:
+		failures.append("View focus: the rock was not placed on screen, so the assertion is vacuous")
+
+	if not rock.can_process():
+		failures.append(
+			"View focus: a rock on screen is frozen -- it is %f from the camera node but only %f from the view centre"
+			% [
+				rock.global_position.distance_to(game.follow_camera.global_position),
+				rock.global_position.distance_to(screen_centre),
+			]
+		)
+	if not rock.is_visible_in_tree():
+		failures.append("View focus: a rock on screen is invisible")
+	if not rock.monitoring or not rock.monitorable:
+		failures.append("View focus: a rock on screen can neither be hit nor hit the player")
 
 	game.queue_free()
 	await process_frame

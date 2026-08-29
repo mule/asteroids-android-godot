@@ -46,12 +46,17 @@ const ASTEROID_SMALL := 2
 ## fills.
 ## It refuels only: hull repair stays a station service, so damage still costs.
 @export var field_clear_refuel: float = 25.0
-## How far from the camera sector content keeps simulating. Half the 1152x648
-## base viewport's diagonal is ~661 units and the camera leads the ship by up
-## to FollowCamera.max_look_ahead (260), so 1200 keeps a full screen of margin
-## on every side: a field is awake and drifting well before the player can see
-## it, and nothing pops in at the edge of the view. Activation.SLEEP_SCALE
-## widens this by 15% again before anything is put back to sleep.
+## How far from the on-screen centre sector content keeps simulating. Half the
+## 1152x648 base viewport's diagonal is ~661 units, so 1200 leaves ~539 units
+## of margin past the corner of the visible rect: content is awake and drifting
+## well before the player can see it, and nothing pops in at the edge of the
+## view. Activation.SLEEP_SCALE widens this by 15% again before anything is put
+## back to sleep.
+##
+## The look-ahead is not a separate term to budget for. It moves the camera,
+## and `_get_activation_focus()` reads where the camera ended up, so the lead
+## is already inside the focus -- see that function for why the camera *node*
+## is the wrong thing to measure from.
 @export var activation_radius: float = 1200.0
 @export var random_seed: int = 1729
 @export var world_light_direction: Vector2 = Vector2(-0.55, -0.83)
@@ -131,19 +136,44 @@ func _physics_process(_delta: float) -> void:
 	if not play_active or paused:
 		return
 
+	var focus := _get_activation_focus()
+
 	active_field_count = Activation.update_group(
 		Activation.GROUP_ASTEROID_FIELDS,
-		follow_camera.global_position,
+		focus,
 		activation_radius
 	)
-	# Rocks that outran their field answer for themselves, against the same
-	# camera and the same radius. Counted separately so `active_field_count`
-	# stays the field-granular measurable the budget test reads.
+	# Rocks with no field to answer for them -- the ones that outran the field
+	# that seeded them, and the ones a split created outside any field --
+	# answer for themselves, against the same focus and the same radius.
+	# Counted separately so `active_field_count` stays the field-granular
+	# measurable the budget test reads.
 	active_loose_asteroid_count = Activation.update_group(
 		Activation.GROUP_LOOSE_ASTEROIDS,
-		follow_camera.global_position,
+		focus,
 		activation_radius
 	)
+
+
+## The centre of what is actually on screen, which is not where the camera
+## node is.
+##
+## `FollowCamera` enables position smoothing and drag margins, and
+## `_apply_sector_bounds()` clamps the rendered view to the sector, so at an
+## edge the node keeps travelling while the view stops. At a corner the two are
+## a half-viewport apart: the node sits on the corner while the view is clamped
+## half a screen inside it, which puts the far edge of the visible rect a
+## *full* viewport diagonal from the node rather than the half diagonal
+## `activation_radius` is sized for. At the 1152x648 base viewport that is 1322
+## units against a 1200 radius -- a rock on screen, asleep, and so invisible,
+## frozen and unhittable. That is the same failure this activation pass exists
+## to prevent, arrived at from the focus point instead of from the extent.
+##
+## `get_screen_center_position()` is the clamped, smoothed centre, so the worst
+## case falls back to the half diagonal (661) and the look-ahead is still
+## carried: it moves the view until the view stops moving.
+func _get_activation_focus() -> Vector2:
+	return follow_camera.get_screen_center_position()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -256,6 +286,12 @@ func _spawn_asteroid(size_tier: int, spawn_position: Vector2, velocity: Vector2)
 
 	entities.add_child(asteroid)
 	asteroid.add_to_group("asteroids")
+	# A split child is born outside every field -- it is parented to `Entities`,
+	# not to the field whose rock it came from -- so no field's sleep state is
+	# an answer about it. Without this it simulates for the rest of the run at
+	# any distance from the camera, and clearing one field leaves more
+	# permanently-awake rocks than the whole sector starts with.
+	asteroid.add_to_group(Activation.GROUP_LOOSE_ASTEROIDS)
 	asteroid.global_position = spawn_position
 	_apply_lighting_to_entity(asteroid)
 

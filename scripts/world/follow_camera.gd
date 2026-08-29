@@ -9,6 +9,15 @@ extends Camera2D
 var target: Node2D
 var current_look_ahead: Vector2 = Vector2.ZERO
 var last_target_position: Vector2 = Vector2.ZERO
+## Camera2D publishes nothing until it has run a frame while current, so the
+## reset_smoothing() set_target() does at _ready() time does not stick: the
+## view spends the opening frames of a run at its top-left limit clamp while
+## the camera is already on the ship, a whole sector away. Harmless when the
+## view is only drawn -- it corrects itself before anything is visible -- but
+## Game._get_activation_focus() decides what to simulate from the view, so
+## those frames would sleep everything around the player at every run start.
+## Seeded from the first _physics_process instead, where the reset takes.
+var _smoothing_seeded: bool = false
 
 
 func _ready() -> void:
@@ -86,5 +95,9 @@ func _physics_process(delta: float) -> void:
 	last_target_position = target.global_position
 	global_position = target.global_position + current_look_ahead
 
-	if teleported:
+	# See _smoothing_seeded: the first pass through here is the earliest point
+	# a reset actually takes, so the view starts the run on the ship rather
+	# than in a corner.
+	if teleported or not _smoothing_seeded:
+		_smoothing_seeded = true
 		reset_smoothing()
