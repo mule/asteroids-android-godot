@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3 uid="uid://dvyvlkp4b6h8k"]
+
+[ext_resource type="Script" path="res://scripts/entities/celestial_body.gd" id="1_celestial"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 120.0
+
+[node name="CelestialBody" type="Area2D"]
+z_index = -20
+collision_layer = 32
+collision_mask = 6
+script = ExtResource("1_celestial")
+
+[node name="BodyShape" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(0, -120, 85, -85, 120, 0, 85, 85, 0, 120, -85, 85, -120, 0, -85, -85)
+color = Color(0.22, 0.28, 0.34, 1)
+
+[node name="DetailShapes" type="Node2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_body")

@@ -527,6 +527,9 @@ func _apply_lighting_to_entities() -> void:
 		for asteroid in field.get_children():
 			_apply_lighting_to_entity(asteroid)
 
+	for body in sector.get_celestial_bodies():
+		_apply_lighting_to_entity(body)
+
 
 func _apply_lighting_to_entity(entity: Node) -> void:
 	if entity == null:
@@ -558,6 +561,9 @@ func _apply_sector_bounds_to_entities() -> void:
 	for field in sector.get_fields():
 		for asteroid in field.get_children():
 			_apply_sector_bounds_to_entity(asteroid)
+
+	for body in sector.get_celestial_bodies():
+		_apply_sector_bounds_to_entity(body)
 
 
 func _apply_sector_bounds_to_entity(entity: Node) -> void:
@@ -600,6 +606,9 @@ func _place_sector_content() -> void:
 		if field.has_method("seed_field"):
 			field.seed_field(random, asteroid_scene, asteroid_visual_assets)
 		_wire_field_asteroids(field)
+
+	for body in sector.get_celestial_bodies():
+		_apply_lighting_to_entity(body)
 
 
 func _wire_field_asteroids(field: Node2D) -> void:
