@@ -16,6 +16,23 @@ const MOON_VISUAL_ASSET := preload("res://assets/generated/celestial/celestial_m
 ## get_station_positions() for what happens when it runs out.
 const _PLACEMENT_ATTEMPTS := 48
 
+## Clearance between a planet's surface and its innermost moon's orbit, and
+## between one orbit slot and the next.
+##
+## Deliberately NOT `min_landmark_separation`. That figure is documented on
+## get_station_positions() as a centre-to-centre distance BETWEEN landmarks,
+## and a planet with its moons is ONE landmark -- placement already models it
+## that way, reserving a single footprint for the whole system via
+## _get_planet_system_radius(). Feeding the inter-landmark figure into the
+## orbit ladder as well made the shipped sector unsatisfiable by construction:
+## at 900 it put planet_01's footprint at 2724px and planet_02's at 1432px, so
+## in an 8000x6000 sector the inset boxes could separate their centres by at
+## most ~4264px while the rule demanded 5056px. No sample and no anchor could
+## satisfy it, so _pick_celestial_system_center() fell through to its
+## best-effort branch every run and degraded by a kilometre in silence --
+## moons sweeping through asteroid fields and through each other's rings.
+const ORBIT_CLEARANCE := 180.0
+
 var _fields: Array[Node2D] = []
 var _celestial_bodies: Array[Area2D] = []
 var _celestial_footprints: Array[Dictionary] = []
@@ -312,7 +329,7 @@ func _place_celestial_bodies(rng: RandomNumberGenerator, min_separation: float) 
 	var planets: Array[Area2D] = []
 	for index in planet_count:
 		var planet_definition := _make_planet_definition(index)
-		var system_radius := _get_planet_system_radius(index, planet_count, moon_count, min_separation)
+		var system_radius := _get_planet_system_radius(index, planet_count, moon_count)
 		var center := _pick_celestial_system_center(rng, system_radius, min_separation)
 		var planet := _spawn_celestial_body(planet_definition, null, 0.0, center)
 		planets.append(planet)
@@ -325,7 +342,7 @@ func _place_celestial_bodies(rng: RandomNumberGenerator, min_separation: float) 
 		var parent_index := index % planets.size()
 		var orbit_slot := index / planets.size()
 		var parent := planets[parent_index]
-		var moon_definition := _make_moon_definition(index, orbit_slot, parent.get_body_radius(), min_separation)
+		var moon_definition := _make_moon_definition(index, orbit_slot, parent.get_body_radius())
 		var initial_angle := rng.randf_range(0.0, TAU)
 		_spawn_celestial_body(moon_definition, parent, initial_angle)
 		_celestial_footprints.append({
@@ -360,7 +377,7 @@ func _make_planet_definition(index: int) -> Resource:
 	return body_definition
 
 
-func _make_moon_definition(index: int, orbit_slot: int, parent_radius: float, min_separation: float) -> Resource:
+func _make_moon_definition(index: int, orbit_slot: int, parent_radius: float) -> Resource:
 	var moon_radius := maxf(64.0, 86.0 - float(index % 2) * 10.0)
 	var body_definition := CELESTIAL_BODY_DEFINITION_SCRIPT.new()
 	body_definition.body_id = StringName("moon_%02d" % (index + 1))
@@ -368,13 +385,13 @@ func _make_moon_definition(index: int, orbit_slot: int, parent_radius: float, mi
 	body_definition.gravity_strength = 350.0
 	body_definition.influence_multiplier = 4.0
 	body_definition.visual_asset = MOON_VISUAL_ASSET
-	body_definition.orbit_radius = parent_radius + moon_radius + min_separation + 180.0
-	body_definition.orbit_radius += float(orbit_slot) * (min_separation + moon_radius * 2.0 + 180.0)
+	body_definition.orbit_radius = parent_radius + moon_radius + ORBIT_CLEARANCE
+	body_definition.orbit_radius += float(orbit_slot) * (ORBIT_CLEARANCE + moon_radius * 2.0)
 	body_definition.orbit_period_seconds = 24.0 + float(index) * 6.0
 	return body_definition
 
 
-func _get_planet_system_radius(index: int, planet_count: int, moon_count: int, min_separation: float) -> float:
+func _get_planet_system_radius(index: int, planet_count: int, moon_count: int) -> float:
 	var planet_definition := _make_planet_definition(index)
 	var system_radius: float = planet_definition.body_radius
 
@@ -384,8 +401,7 @@ func _get_planet_system_radius(index: int, planet_count: int, moon_count: int, m
 		var moon_definition := _make_moon_definition(
 			moon_index,
 			orbit_slot,
-			planet_definition.body_radius,
-			min_separation
+			planet_definition.body_radius
 		)
 		system_radius = maxf(system_radius, moon_definition.orbit_radius + moon_definition.body_radius)
 		moon_index += planet_count

@@ -5,6 +5,10 @@ const BODY_DEFINITION_SCRIPT := "res://scripts/resources/celestial_body_definiti
 const BODY_SCENE := "res://scenes/entities/CelestialBody.tscn"
 const SECTOR_DEFINITION_SCRIPT := "res://scripts/resources/sector_definition.gd"
 const SECTOR_SCRIPT := "res://scripts/world/sector.gd"
+## The resource `Game.tscn` actually loads. Asserted against directly: the
+## placement rules are a property of the sector that ships, and a test that
+## invents a roomier one can be green while the shipped sector breaks them.
+const SHIPPED_SECTOR := "res://assets/sectors/sector_default.tres"
 
 
 func _init() -> void:
@@ -14,6 +18,7 @@ func _init() -> void:
 	await _test_moon_completes_orbit_period(failures)
 	await _test_planet_does_not_move(failures)
 	await _test_sector_places_bodies_inside_bounds_and_apart(failures)
+	await _test_the_shipped_sector_satisfies_its_own_placement_rules(failures)
 	await _test_bodies_join_gravity_sources_group(failures)
 
 	for failure in failures:
@@ -198,17 +203,144 @@ func _test_sector_places_bodies_inside_bounds_and_apart(failures: Array[String])
 			"position": footprint_center,
 			"body_radius": radius,
 			"orbit_radius": orbit_radius,
+			# The planet this body belongs to: itself for a planet, its
+			# orbit_parent for a moon. Pairs sharing one are a single landmark.
+			"system": (body.get("orbit_parent") as Node2D) if orbit_radius > 0.0 else body,
 		})
 
+	# `min_landmark_separation` is asserted BETWEEN landmarks only. A planet and
+	# the moons orbiting it are one landmark -- placement reserves a single
+	# footprint for the whole system -- so same-system pairs are held to
+	# Sector.ORBIT_CLEARANCE instead, checked below.
 	for i in footprints.size():
 		for j in range(i + 1, footprints.size()):
 			var a := footprints[i]
 			var b := footprints[j]
+			if a["system"] != null and a["system"] == b["system"]:
+				continue
 			var gap := _swept_landmark_gap(a, b)
 			if gap < definition.min_landmark_separation:
 				failures.append(
 					"Sector separation: %s and %s leave gap %f, expected at least %f"
 					% [a["name"], b["name"], gap, definition.min_landmark_separation]
+				)
+
+	var clearance: float = sector_script.get_script_constant_map()["ORBIT_CLEARANCE"]
+	for i in footprints.size():
+		for j in range(i + 1, footprints.size()):
+			var a := footprints[i]
+			var b := footprints[j]
+			if a["system"] == null or a["system"] != b["system"]:
+				continue
+
+			# Both orbit the same planet: their swept annuli must not touch.
+			if a["orbit_radius"] > 0.0 and b["orbit_radius"] > 0.0:
+				var ring_gap: float = (
+					absf(a["orbit_radius"] - b["orbit_radius"]) - a["body_radius"] - b["body_radius"]
+				)
+				if ring_gap < clearance:
+					failures.append(
+						"Orbit clearance: %s and %s share a parent and leave %f between rings, expected %f"
+						% [a["name"], b["name"], ring_gap, clearance]
+					)
+				continue
+
+			# One of them is the parent planet: the moon's inner sweep must
+			# clear the planet's surface.
+			var moon := b if a["orbit_radius"] <= 0.0 else a
+			var planet := a if a["orbit_radius"] <= 0.0 else b
+			var surface_gap: float = (
+				moon["orbit_radius"] - moon["body_radius"] - planet["body_radius"]
+			)
+			if surface_gap < clearance:
+				failures.append(
+					"Orbit clearance: %s passes %f from %s's surface, expected %f"
+					% [moon["name"], surface_gap, planet["name"], clearance]
+				)
+
+	sector.queue_free()
+	await process_frame
+
+
+## The shipped sector, judged by #51's own acceptance criterion.
+##
+## `_test_sector_places_bodies_inside_bounds_and_apart` builds a 9000x7000
+## sector with 760px separation and three small fields, and passes. The game
+## loads `sector_default.tres`: 8000x6000, 900px, five fields up to 560. That
+## substitution is what let a green suite ship a sector whose moons sweep
+## through asteroid fields, so this asserts the same rules against the real
+## resource.
+##
+## A planet and the moons orbiting it are ONE landmark -- that is what the
+## placement code already models, reserving a single footprint for the whole
+## system -- so `min_landmark_separation` is asserted BETWEEN systems and
+## between a system and a field, never inside a system. Intra-system spacing is
+## its own, much smaller concern and is checked separately.
+func _test_the_shipped_sector_satisfies_its_own_placement_rules(failures: Array[String]) -> void:
+	var sector_script := _load_resource(SECTOR_SCRIPT, failures) as Script
+	var definition: Resource = _load_resource(SHIPPED_SECTOR, failures) as Resource
+	if sector_script == null or definition == null:
+		return
+
+	var sector := sector_script.new() as Node2D
+	sector.definition = definition
+	root.add_child(sector)
+	await process_frame
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = definition.sector_seed
+	sector.place_content(rng)
+	await process_frame
+
+	var bodies: Array = sector.get_celestial_bodies()
+	var bounds: Rect2 = definition.get_bounds()
+	var separation: float = definition.min_landmark_separation
+
+	# One entry per planet system: the parent planet, and the radius of the
+	# disc the whole system occupies once its moons have swept a full orbit.
+	var systems: Dictionary = {}
+	for body in bodies:
+		var body_definition = body.get("definition")
+		var orbit: float = body_definition.orbit_radius if body_definition != null else 0.0
+		var parent: Node2D = body if orbit <= 0.0 else (body.get("orbit_parent") as Node2D)
+		if parent == null:
+			failures.append("Shipped sector: %s orbits nothing, so it belongs to no landmark" % body.name)
+			continue
+		var reach: float = orbit + body.get_body_radius()
+		if not systems.has(parent):
+			systems[parent] = {"name": parent.name, "position": parent.global_position, "radius": 0.0}
+		systems[parent]["radius"] = maxf(systems[parent]["radius"], reach)
+
+		if not _circle_inside_bounds(body.global_position, body.get_body_radius(), bounds):
+			failures.append("Shipped sector: %s sits outside the sector" % body.name)
+
+	var keys: Array = systems.keys()
+	for i in keys.size():
+		var a: Dictionary = systems[keys[i]]
+
+		if not _circle_inside_bounds(a["position"], a["radius"], bounds):
+			failures.append(
+				"Shipped sector: %s's system footprint (r=%.0f) is not inside the sector"
+				% [a["name"], a["radius"]]
+			)
+
+		for j in range(i + 1, keys.size()):
+			var b: Dictionary = systems[keys[j]]
+			var gap: float = a["position"].distance_to(b["position"]) - a["radius"] - b["radius"]
+			if gap < separation:
+				failures.append(
+					"Shipped sector: systems %s and %s leave %.0f, want >= %.0f"
+					% [a["name"], b["name"], gap, separation]
+				)
+
+		for field in sector.get_fields():
+			var field_gap: float = (
+				a["position"].distance_to(field.global_position) - a["radius"] - field.field_radius
+			)
+			if field_gap < separation:
+				failures.append(
+					"Shipped sector: system %s and %s leave %.0f, want >= %.0f"
+					% [a["name"], field.field_name, field_gap, separation]
 				)
 
 	sector.queue_free()
