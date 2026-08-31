@@ -2,6 +2,7 @@ extends Area2D
 
 
 const MATERIAL_RUNTIME := preload("res://scripts/material_runtime.gd")
+const GRAVITY_FIELD := preload("res://scripts/world/gravity_field.gd")
 const WORLD_BOUNDS := preload("res://scripts/world/world_bounds.gd")
 
 signal shoot_requested(muzzle_position: Vector2, direction: Vector2, inherited_velocity: Vector2)
@@ -61,6 +62,7 @@ func _physics_process(delta: float) -> void:
 	_update_fire_cooldown(delta)
 	_apply_rotation_input(delta)
 	_apply_thrust_input(delta)
+	_apply_gravity(delta)
 	_apply_shoot_input()
 	_apply_drift(delta)
 	_move(delta)
@@ -85,6 +87,15 @@ func _apply_thrust_input(delta: float) -> void:
 	var factor := _get_thrust_factor()
 	ship_systems.consume_fuel(delta)
 	velocity += Vector2.UP.rotated(rotation) * acceleration * factor * delta
+	velocity = velocity.limit_length(max_speed)
+
+
+func _apply_gravity(delta: float) -> void:
+	var gravity: Vector2 = GRAVITY_FIELD.accumulate(global_position, get_tree().get_nodes_in_group(&"gravity_sources"))
+	if gravity == Vector2.ZERO:
+		return
+
+	velocity += gravity * delta
 	velocity = velocity.limit_length(max_speed)
 
 

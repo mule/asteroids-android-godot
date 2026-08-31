@@ -2,6 +2,7 @@ extends Area2D
 
 
 const MATERIAL_RUNTIME := preload("res://scripts/material_runtime.gd")
+const GRAVITY_FIELD := preload("res://scripts/world/gravity_field.gd")
 const WORLD_BOUNDS := preload("res://scripts/world/world_bounds.gd")
 
 signal destroyed(asteroid: Area2D, size_tier: int, hit_position: Vector2, incoming_velocity: Vector2)
@@ -39,6 +40,7 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_apply_gravity(delta)
 	_limit_velocity_for_discrete_collision(delta)
 	position += velocity * delta
 	rotation += deg_to_rad(rotation_speed_degrees) * delta
@@ -56,6 +58,14 @@ func _limit_velocity_for_discrete_collision(delta: float) -> void:
 	# combined radii, so they cannot cross completely between overlap snapshots.
 	var max_safe_speed := get_collision_radius() / delta
 	velocity = velocity.limit_length(max_safe_speed)
+
+
+func _apply_gravity(delta: float) -> void:
+	var gravity: Vector2 = GRAVITY_FIELD.accumulate(global_position, get_tree().get_nodes_in_group(&"gravity_sources"))
+	if gravity == Vector2.ZERO:
+		return
+
+	velocity += gravity * delta
 
 
 func setup(tier: int, initial_velocity: Vector2, selected_visual_asset: Resource = null, initial_rotation: float = 0.0) -> void:
