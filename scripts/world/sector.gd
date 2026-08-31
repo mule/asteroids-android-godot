@@ -5,6 +5,10 @@ class_name Sector
 
 
 const ASTEROID_FIELD_SCENE := preload("res://scenes/world/AsteroidField.tscn")
+const CELESTIAL_BODY_SCENE := preload("res://scenes/entities/CelestialBody.tscn")
+const CELESTIAL_BODY_DEFINITION_SCRIPT := preload("res://scripts/resources/celestial_body_definition.gd")
+const PLANET_VISUAL_ASSET := preload("res://assets/generated/celestial/celestial_planet_01.tres")
+const MOON_VISUAL_ASSET := preload("res://assets/generated/celestial/celestial_moon_01.tres")
 
 @export var definition: Resource
 
@@ -12,7 +16,26 @@ const ASTEROID_FIELD_SCENE := preload("res://scenes/world/AsteroidField.tscn")
 ## get_station_positions() for what happens when it runs out.
 const _PLACEMENT_ATTEMPTS := 48
 
+## Clearance between a planet's surface and its innermost moon's orbit, and
+## between one orbit slot and the next.
+##
+## Deliberately NOT `min_landmark_separation`. That figure is documented on
+## get_station_positions() as a centre-to-centre distance BETWEEN landmarks,
+## and a planet with its moons is ONE landmark -- placement already models it
+## that way, reserving a single footprint for the whole system via
+## _get_planet_system_radius(). Feeding the inter-landmark figure into the
+## orbit ladder as well made the shipped sector unsatisfiable by construction:
+## at 900 it put planet_01's footprint at 2724px and planet_02's at 1432px, so
+## in an 8000x6000 sector the inset boxes could separate their centres by at
+## most ~4264px while the rule demanded 5056px. No sample and no anchor could
+## satisfy it, so _pick_celestial_system_center() fell through to its
+## best-effort branch every run and degraded by a kilometre in silence --
+## moons sweeping through asteroid fields and through each other's rings.
+const ORBIT_CLEARANCE := 180.0
+
 var _fields: Array[Node2D] = []
+var _celestial_bodies: Array[Area2D] = []
+var _celestial_footprints: Array[Dictionary] = []
 
 
 func get_bounds() -> Rect2:
@@ -87,6 +110,7 @@ func get_random_position(rng: RandomNumberGenerator, inset: float = 0.0) -> Vect
 
 func place_content(rng: RandomNumberGenerator) -> void:
 	_clear_fields()
+	_clear_celestial_bodies()
 
 	if definition == null:
 		return
@@ -111,6 +135,10 @@ func place_content(rng: RandomNumberGenerator) -> void:
 		add_child(field)
 		_fields.append(field)
 
+	var celestial_rng := RandomNumberGenerator.new()
+	celestial_rng.seed = rng.seed + 9109
+	_place_celestial_bodies(celestial_rng, min_separation)
+
 
 func get_fields() -> Array[Node2D]:
 	var fields: Array[Node2D] = []
@@ -120,19 +148,27 @@ func get_fields() -> Array[Node2D]:
 	return fields
 
 
+func get_celestial_bodies() -> Array[Area2D]:
+	var bodies: Array[Area2D] = []
+	for body in _celestial_bodies:
+		if is_instance_valid(body) and not body.is_queued_for_deletion():
+			bodies.append(body)
+	return bodies
+
+
 func find_free_position(rng: RandomNumberGenerator, radius: float, min_separation: float) -> Vector2:
 	var best_position := Vector2.ZERO
-	var best_distance := -INF
+	var best_slack := -INF
 
 	for attempt in 32:
 		var candidate := get_random_position(rng, radius)
-		var nearest_distance := _get_nearest_field_distance(candidate)
+		var slack := _get_nearest_field_distance(candidate) - min_separation
 
-		if nearest_distance >= min_separation:
+		if slack >= 0.0:
 			return candidate
 
-		if nearest_distance > best_distance:
-			best_distance = nearest_distance
+		if slack > best_slack:
+			best_slack = slack
 			best_position = candidate
 
 	return best_position
@@ -279,6 +315,185 @@ func _get_field_edge_gap(candidate: Vector2) -> float:
 		gap = minf(gap, candidate.distance_to(field.position) - radius)
 
 	return gap
+
+
+func _place_celestial_bodies(rng: RandomNumberGenerator, min_separation: float) -> void:
+	var planet_count: int = definition.planet_count if "planet_count" in definition else 0
+	var moon_count: int = definition.moon_count if "moon_count" in definition else 0
+	planet_count = maxi(0, planet_count)
+	moon_count = maxi(0, moon_count)
+
+	if planet_count <= 0:
+		return
+
+	var planets: Array[Area2D] = []
+	for index in planet_count:
+		var planet_definition := _make_planet_definition(index)
+		var system_radius := _get_planet_system_radius(index, planet_count, moon_count)
+		var center := _pick_celestial_system_center(rng, system_radius, min_separation)
+		var planet := _spawn_celestial_body(planet_definition, null, 0.0, center)
+		planets.append(planet)
+		_celestial_footprints.append({
+			"position": center,
+			"radius": system_radius,
+		})
+
+	for index in moon_count:
+		var parent_index := index % planets.size()
+		var orbit_slot := index / planets.size()
+		var parent := planets[parent_index]
+		var moon_definition := _make_moon_definition(index, orbit_slot, parent.get_body_radius())
+		var initial_angle := rng.randf_range(0.0, TAU)
+		_spawn_celestial_body(moon_definition, parent, initial_angle)
+		_celestial_footprints.append({
+			"position": parent.global_position,
+			"radius": moon_definition.orbit_radius + moon_definition.body_radius,
+		})
+
+
+func _spawn_celestial_body(
+	body_definition: Resource,
+	parent_body: Node2D,
+	initial_angle: float,
+	spawn_position: Vector2 = Vector2.ZERO
+) -> Area2D:
+	var body := CELESTIAL_BODY_SCENE.instantiate() as Area2D
+	add_child(body)
+	body.global_position = spawn_position
+	body.setup(body_definition, parent_body, initial_angle)
+	_celestial_bodies.append(body)
+	return body
+
+
+func _make_planet_definition(index: int) -> Resource:
+	var body_definition := CELESTIAL_BODY_DEFINITION_SCRIPT.new()
+	body_definition.body_id = StringName("planet_%02d" % (index + 1))
+	body_definition.body_radius = maxf(170.0, 220.0 - float(index % 3) * 20.0)
+	body_definition.gravity_strength = 1400.0
+	body_definition.influence_multiplier = 4.0
+	body_definition.visual_asset = PLANET_VISUAL_ASSET
+	body_definition.orbit_radius = 0.0
+	body_definition.orbit_period_seconds = 0.0
+	return body_definition
+
+
+func _make_moon_definition(index: int, orbit_slot: int, parent_radius: float) -> Resource:
+	var moon_radius := maxf(64.0, 86.0 - float(index % 2) * 10.0)
+	var body_definition := CELESTIAL_BODY_DEFINITION_SCRIPT.new()
+	body_definition.body_id = StringName("moon_%02d" % (index + 1))
+	body_definition.body_radius = moon_radius
+	body_definition.gravity_strength = 350.0
+	body_definition.influence_multiplier = 4.0
+	body_definition.visual_asset = MOON_VISUAL_ASSET
+	body_definition.orbit_radius = parent_radius + moon_radius + ORBIT_CLEARANCE
+	body_definition.orbit_radius += float(orbit_slot) * (ORBIT_CLEARANCE + moon_radius * 2.0)
+	body_definition.orbit_period_seconds = 24.0 + float(index) * 6.0
+	return body_definition
+
+
+func _get_planet_system_radius(index: int, planet_count: int, moon_count: int) -> float:
+	var planet_definition := _make_planet_definition(index)
+	var system_radius: float = planet_definition.body_radius
+
+	var moon_index := index
+	while moon_index < moon_count:
+		var orbit_slot := moon_index / planet_count
+		var moon_definition := _make_moon_definition(
+			moon_index,
+			orbit_slot,
+			planet_definition.body_radius
+		)
+		system_radius = maxf(system_radius, moon_definition.orbit_radius + moon_definition.body_radius)
+		moon_index += planet_count
+
+	return system_radius
+
+
+func _pick_celestial_system_center(
+	rng: RandomNumberGenerator,
+	system_radius: float,
+	min_separation: float
+) -> Vector2:
+	var best := Vector2.ZERO
+	var best_slack := -INF
+
+	for _attempt in _PLACEMENT_ATTEMPTS * 8:
+		var candidate := get_random_position(rng, system_radius)
+		var slack := _get_celestial_system_slack(candidate, system_radius, min_separation)
+		if slack >= 0.0:
+			return candidate
+
+		if slack > best_slack:
+			best_slack = slack
+			best = candidate
+
+	for candidate in _get_celestial_anchor_positions(system_radius):
+		var slack := _get_celestial_system_slack(candidate, system_radius, min_separation)
+		if slack >= 0.0:
+			return candidate
+
+		if slack > best_slack:
+			best_slack = slack
+			best = candidate
+
+	return best
+
+
+func _get_celestial_system_slack(candidate: Vector2, radius: float, min_separation: float) -> float:
+	return minf(
+		_get_nearest_celestial_gap(candidate, radius) - min_separation,
+		_get_field_edge_gap(candidate) - radius - min_separation
+	)
+
+
+func _get_nearest_celestial_gap(candidate: Vector2, radius: float) -> float:
+	var gap := INF
+
+	for footprint in _celestial_footprints:
+		var footprint_position: Vector2 = footprint["position"]
+		var footprint_radius: float = footprint["radius"]
+		gap = minf(gap, candidate.distance_to(footprint_position) - radius - footprint_radius)
+
+	return gap
+
+
+func _get_celestial_anchor_positions(radius: float) -> Array[Vector2]:
+	var bounds := get_bounds()
+	var limit := Vector2(
+		minf(radius, bounds.size.x * 0.5),
+		minf(radius, bounds.size.y * 0.5)
+	)
+	var left := bounds.position.x + limit.x
+	var right := bounds.end.x - limit.x
+	var top := bounds.position.y + limit.y
+	var bottom := bounds.end.y - limit.y
+	var center := bounds.get_center()
+
+	return [
+		Vector2(left, top),
+		Vector2(right, top),
+		Vector2(left, bottom),
+		Vector2(right, bottom),
+		Vector2(center.x, top),
+		Vector2(center.x, bottom),
+		Vector2(left, center.y),
+		Vector2(right, center.y),
+		center,
+	]
+
+
+func _clear_celestial_bodies() -> void:
+	for body in _celestial_bodies:
+		if not is_instance_valid(body):
+			continue
+
+		var parent := body.get_parent()
+		if parent != null:
+			parent.remove_child(body)
+		body.queue_free()
+
+	_celestial_bodies.clear()
+	_celestial_footprints.clear()
 
 
 func _get_nearest_gap(candidate: Vector2, placed: Array[Vector2], avoid: Array) -> float:
