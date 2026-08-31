@@ -46,6 +46,18 @@ const ASTEROID_SMALL := 2
 ## fills.
 ## It refuels only: hull repair stays a station service, so damage still costs.
 @export var field_clear_refuel: float = 25.0
+## How far from the on-screen centre sector content keeps simulating. Half the
+## 1152x648 base viewport's diagonal is ~661 units, so 1200 leaves ~539 units
+## of margin past the corner of the visible rect: content is awake and drifting
+## well before the player can see it, and nothing pops in at the edge of the
+## view. Activation.SLEEP_SCALE widens this by 15% again before anything is put
+## back to sleep.
+##
+## The look-ahead is not a separate term to budget for. It moves the camera,
+## and `_get_activation_focus()` reads where the camera ended up, so the lead
+## is already inside the focus -- see that function for why the camera *node*
+## is the wrong thing to measure from.
+@export var activation_radius: float = 1200.0
 @export var random_seed: int = 1729
 @export var world_light_direction: Vector2 = Vector2(-0.55, -0.83)
 @export var shader_lighting_enabled: bool = true
@@ -74,6 +86,13 @@ var invulnerability_token: int = 0
 ## dock panel shows one station's prices and `_on_undock_requested` has to know
 ## whose dock it is releasing.
 var active_station: Node = null
+## Fields left simulating by the last activation pass. Read by the tests as the
+## frame-budget measurable -- it is the number that a later issue adding
+## content to the sector must not quietly grow.
+var active_field_count: int = 0
+## Rocks left simulating on their own account by the last activation pass --
+## those that have drifted clear of the field that spawned them.
+var active_loose_asteroid_count: int = 0
 
 
 func _ready() -> void:
@@ -105,6 +124,56 @@ func _ready() -> void:
 	_build_star_layers()
 	if auto_start:
 		_start_new_game()
+
+
+## Driven from the camera, not the ship. The camera leads the ship by its
+## look-ahead, so at speed it is already most of a screen ahead of the hull;
+## activating around the ship would leave the fields the player is flying into
+## asleep until they were on top of them, which is the pop-in this issue
+## exists to avoid. The camera is what the player can see, so the camera is
+## what decides what has to be simulated.
+func _physics_process(_delta: float) -> void:
+	if not play_active or paused:
+		return
+
+	var focus := _get_activation_focus()
+
+	active_field_count = Activation.update_group(
+		Activation.GROUP_ASTEROID_FIELDS,
+		focus,
+		activation_radius
+	)
+	# Rocks with no field to answer for them -- the ones that outran the field
+	# that seeded them, and the ones a split created outside any field --
+	# answer for themselves, against the same focus and the same radius.
+	# Counted separately so `active_field_count` stays the field-granular
+	# measurable the budget test reads.
+	active_loose_asteroid_count = Activation.update_group(
+		Activation.GROUP_LOOSE_ASTEROIDS,
+		focus,
+		activation_radius
+	)
+
+
+## The centre of what is actually on screen, which is not where the camera
+## node is.
+##
+## `FollowCamera` enables position smoothing and drag margins, and
+## `_apply_sector_bounds()` clamps the rendered view to the sector, so at an
+## edge the node keeps travelling while the view stops. At a corner the two are
+## a half-viewport apart: the node sits on the corner while the view is clamped
+## half a screen inside it, which puts the far edge of the visible rect a
+## *full* viewport diagonal from the node rather than the half diagonal
+## `activation_radius` is sized for. At the 1152x648 base viewport that is 1322
+## units against a 1200 radius -- a rock on screen, asleep, and so invisible,
+## frozen and unhittable. That is the same failure this activation pass exists
+## to prevent, arrived at from the focus point instead of from the extent.
+##
+## `get_screen_center_position()` is the clamped, smoothed centre, so the worst
+## case falls back to the half diagonal (661) and the look-ahead is still
+## carried: it moves the view until the view stops moving.
+func _get_activation_focus() -> Vector2:
+	return follow_camera.get_screen_center_position()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -217,6 +286,12 @@ func _spawn_asteroid(size_tier: int, spawn_position: Vector2, velocity: Vector2)
 
 	entities.add_child(asteroid)
 	asteroid.add_to_group("asteroids")
+	# A split child is born outside every field -- it is parented to `Entities`,
+	# not to the field whose rock it came from -- so no field's sleep state is
+	# an answer about it. Without this it simulates for the rest of the run at
+	# any distance from the camera, and clearing one field leaves more
+	# permanently-awake rocks than the whole sector starts with.
+	asteroid.add_to_group(Activation.GROUP_LOOSE_ASTEROIDS)
 	asteroid.global_position = spawn_position
 	_apply_lighting_to_entity(asteroid)
 
@@ -603,6 +678,8 @@ func _place_sector_content() -> void:
 	for field in sector.get_fields():
 		if field.has_signal("field_cleared"):
 			field.connect("field_cleared", _on_asteroid_field_cleared)
+		if field.has_signal("asteroid_escaped"):
+			field.connect("asteroid_escaped", _on_asteroid_escaped_field)
 		if field.has_method("seed_field"):
 			field.seed_field(random, asteroid_scene, asteroid_visual_assets)
 		_wire_field_asteroids(field)
@@ -623,6 +700,28 @@ func _wire_field_asteroids(field: Node2D) -> void:
 			var callback := Callable(self, "_on_asteroid_destroyed")
 			if not asteroid.is_connected("destroyed", callback):
 				asteroid.connect("destroyed", callback)
+
+
+## Move a drifted rock out from under its field and let it be activated on its
+## own position.
+##
+## Reparenting is what makes this work at all, not bookkeeping: `Activation`
+## sleeps a field with PROCESS_MODE_DISABLED, which disables the whole subtree,
+## so a rock still parented to a sleeping field cannot be woken by any group it
+## belongs to. `Entities` is the same home the split children already get, so
+## the rock keeps the lighting, sector-bounds and restart handling that node
+## already carries.
+##
+## The field keeps its `destroyed` connection and its active count. A field
+## whose rocks have wandered off is not cleared -- the player still has to
+## destroy them -- and `field_cleared` must not fire early just because they
+## left the circle.
+func _on_asteroid_escaped_field(field: Node2D, asteroid: Area2D) -> void:
+	if not is_instance_valid(asteroid) or asteroid.get_parent() != field:
+		return
+
+	asteroid.call_deferred("reparent", entities, true)
+	asteroid.call_deferred("add_to_group", Activation.GROUP_LOOSE_ASTEROIDS)
 
 
 func _on_asteroid_field_cleared(field: Node2D) -> void:
