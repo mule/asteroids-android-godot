@@ -53,6 +53,7 @@ func _init() -> void:
 	await _test_gravity_free_ship_motion_stays_unchanged(failures)
 	await _test_player_ship_accumulates_gravity(failures)
 	await _test_asteroid_accumulates_gravity(failures)
+	_test_the_cap_tracks_the_ship_it_protects(failures)
 	await _test_full_thrust_escapes_every_committed_body(failures)
 	_test_acceleration_is_exactly_zero_outside_influence(failures)
 	_test_acceleration_increases_toward_surface(failures)
@@ -68,6 +69,41 @@ func _init() -> void:
 	else:
 		printerr("FAILED %d TESTS" % failures.size())
 		quit(1)
+
+
+## The cap is a promise about one specific ship: surface gravity is
+## SURFACE_ACCELERATION_CAP_RATIO of what the player can push back with, so
+## full thrust escapes by construction rather than by tuning. GravityField
+## cannot read that number off player_ship.gd -- player_ship.gd preloads
+## GravityField, and GDScript rejects the cycle -- so the ship's acceleration
+## is duplicated there as a constant, and this is the only thing holding the
+## two together. The escapability test below cannot do it: it reads the
+## scene's own acceleration, so it keeps passing while the real ratio drifts,
+## right up until a weakened ship stops escaping at all.
+func _test_the_cap_tracks_the_ship_it_protects(failures: Array[String]) -> void:
+	var player := (load(PLAYER_SCENE) as PackedScene).instantiate() as Area2D
+	var ship_acceleration: float = player.acceleration
+	player.free()
+
+	if ship_acceleration <= 0.0:
+		failures.append("Cap drift: PlayerShip.acceleration is %.1f, so the cap protects nothing" % ship_acceleration)
+		return
+
+	if is_equal_approx(GRAVITY_FIELD.PLAYER_MAX_THRUST_ACCELERATION, ship_acceleration):
+		return
+
+	var actual_ratio: float = GRAVITY_FIELD.max_surface_acceleration(
+		GRAVITY_FIELD.PLAYER_MAX_THRUST_ACCELERATION
+	) / ship_acceleration
+	failures.append(
+		"Cap drift: GravityField assumes a %.1f thrust ship but PlayerShip.acceleration is %.1f, putting surface gravity at %.2f of thrust instead of %.2f"
+		% [
+			GRAVITY_FIELD.PLAYER_MAX_THRUST_ACCELERATION,
+			ship_acceleration,
+			actual_ratio,
+			GRAVITY_FIELD.SURFACE_ACCELERATION_CAP_RATIO,
+		]
+	)
 
 
 func _test_full_thrust_escapes_every_committed_body(failures: Array[String]) -> void:
@@ -121,6 +157,43 @@ func _test_full_thrust_escapes_every_committed_body(failures: Array[String]) -> 
 				"Escapability: full thrust did not escape %s from surface radius %.1f within %.1fs"
 				% [body.name, radius, 720.0 * delta]
 			)
+
+	# Per body is what #52 asks for, but it is not what a ship flies through.
+	# Every moon in the shipped sector orbits INSIDE its planet's influence
+	# radius, so the field fought near a moon is the moon's plus the planet's.
+	# On the shipped sector that sums to 0.82 of thrust where the cap alone
+	# reads 0.70, and the margin narrows with every moon a sector adds -- so
+	# the escape is asserted against the sum, and outward in every direction
+	# rather than only along +X, because the summed field is not radial.
+	var sources: Array[Node] = get_nodes_in_group("gravity_sources")
+	for body in bodies:
+		var radius: float = body.get_body_radius()
+		var influence_radius: float = body.get_influence_radius()
+
+		for step in 24:
+			var angle := TAU * float(step) / 24.0
+			var away := Vector2.RIGHT.rotated(angle)
+			var position: Vector2 = body.global_position + away * radius
+			var velocity := Vector2.ZERO
+			var delta := 1.0 / 60.0
+			var escaped := false
+
+			for _frame in 900:
+				var gravity: Vector2 = GRAVITY_FIELD.accumulate(position, sources)
+				velocity += (away * player_acceleration + gravity) * delta
+				velocity = velocity.limit_length(max_speed)
+				position += velocity * delta
+
+				if position.distance_to(body.global_position) > influence_radius:
+					escaped = true
+					break
+
+			if not escaped:
+				failures.append(
+					"Escapability: full thrust did not escape %s through the summed field, thrusting %.0f degrees outward"
+					% [body.name, rad_to_deg(angle)]
+				)
+				break
 
 	for body in bodies:
 		body.remove_from_group("gravity_sources")
