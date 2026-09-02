@@ -91,7 +91,14 @@ func _apply_thrust_input(delta: float) -> void:
 
 
 func _apply_gravity(delta: float) -> void:
-	var gravity: Vector2 = GRAVITY_FIELD.accumulate(global_position, get_tree().get_nodes_in_group(&"gravity_sources"))
+	# The ship's CURRENT thrust, not its full-tank thrust: the cap has to track
+	# what the ship can actually do, or a dry tank is a trap. See
+	# GravityField.acceleration_from().
+	var gravity: Vector2 = GRAVITY_FIELD.accumulate(
+		global_position,
+		get_tree().get_nodes_in_group(&"gravity_sources"),
+		acceleration * _get_thrust_factor()
+	)
 	if gravity == Vector2.ZERO:
 		return
 
